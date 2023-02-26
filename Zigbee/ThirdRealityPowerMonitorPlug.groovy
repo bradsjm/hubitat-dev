@@ -44,11 +44,10 @@ metadata {
         capability 'Switch'
         capability 'Voltage Measurement'
 
+        command 'toggle'
         command 'updateFirmware'
 
         attribute 'healthStatus', 'enum', [ 'unknown', 'offline', 'online' ]
-
-        command 'toggle'
 
         fingerprint model: '3RSP02028BZ', manufacturer: 'Third Reality, Inc', profileId: '0104', endpointId: '01', inClusters: '0000,0003,0004,0005,0006,1000,0B04', outClusters: '0019', application: '1E'
     }
@@ -83,6 +82,12 @@ List<String> configure() {
     if (settings.powerRestore != null) {
         cmds += zigbee.writeAttribute(zigbee.ON_OFF_CLUSTER, POWER_RESTORE_ID, DataType.ENUM8, settings.powerRestore as Integer, [:], DELAY_MS)
     }
+
+    cmds += zigbee.configureReporting(zigbee.ON_OFF_CLUSTER, POWER_ON_OFF_ID, DataType.BOOLEAN, 0, 3600, 1, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, ACTIVE_POWER_ID, DataType.INT16, 5, 3600, 10, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_CURRENT_ID, DataType.UINT16, 5, 3600, 50, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_CURRENT_ID, DataType.UINT16, 5, 3600, 5, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, AC_FREQUENCY_ID, DataType.UINT16, 5, 3600, 1, [:], DELAY_MS)
 
     if (settings.logEnable) { log.debug "zigbee configure cmds: ${cmds}" }
 
@@ -153,11 +158,13 @@ List<String> refresh() {
     ], [:], DELAY_MS)
 
     // Get Current Power Measurement
+    cmds += zigbee.readAttribute(zigbee.ON_OFF_CLUSTER, POWER_ON_OFF_ID, [:], DELAY_MS)
+
     cmds += zigbee.readAttribute(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, [
         AC_FREQUENCY_ID,
         RMS_CURRENT_ID,
         RMS_VOLTAGE_ID,
-        ACTIVE_POWER_ID,
+        ACTIVE_POWER_ID
     ], [:], DELAY_MS)
 
     scheduleCommandTimeoutCheck()
@@ -207,7 +214,7 @@ void parse(String description) {
     }
 
     if (settings.logEnable) {
-        String clusterName = zigbee.clusterLookup(descMap.clusterInt)
+        String clusterName = clusterLookup(descMap.clusterInt)
         String attribute = descMap.attrId ? " attribute 0x${descMap.attrId} (value ${descMap.value})" : ''
         if (settings.logEnable) { log.trace "zigbee received ${clusterName} message" + attribute }
     }
@@ -296,7 +303,7 @@ void parseElectricalMeasurementCluster(Map descMap) {
             Integer multiplier = state.attributes[(String)AC_POWER_MULTIPLIER_ID]
             Integer divisor = state.attributes[(String)AC_POWER_DIVISOR_ID]
             if (multiplier > 0 && divisor > 0) {
-                BigDecimal result = value * multiplier / divisor
+                BigDecimal result = (int)value * multiplier / divisor
                 updateAttribute('power', result.setScale(1, RoundingMode.HALF_UP), 'W')
             }
             break
@@ -323,19 +330,22 @@ void parseGlobalCommands(Map descMap) {
             int statusCode = hexStrToUnsignedInt(descMap.data in List ? descMap.data[0] : descMap.data)
             String status = "0x${intToHexStr(statusCode)}"
             if (settings.logEnable) {
-                log.trace "zigbee response write ${zigbee.clusterLookup(descMap.clusterInt)} attribute response: ${status}"
+                log.trace "zigbee response write ${clusterLookup(descMap.clusterInt)} attribute response: ${status}"
             } else if (statusCode != 0x00) {
-                log.warn "zigbee response write ${zigbee.clusterLookup(descMap.clusterInt)} attribute error: ${status}"
+                log.warn "zigbee response write ${clusterLookup(descMap.clusterInt)} attribute error: ${status}"
             }
+            break
+        case 0x07: // configure reporting response
+            log.info "reporting for ${clusterLookup(descMap.clusterInt)} enabled sucessfully"
             break
         case 0x0B: // default command response
             String commandId = descMap.data[0]
             int statusCode = hexStrToUnsignedInt(descMap.data[1])
             String status = "0x${descMap.data[1]}"
             if (settings.logEnable) {
-                log.trace "zigbee command status ${zigbee.clusterLookup(descMap.clusterInt)} command 0x${commandId}: ${status}"
+                log.trace "zigbee command status ${clusterLookup(descMap.clusterInt)} command 0x${commandId}: ${status}"
             } else if (statusCode != 0x00) {
-                log.warn "zigbee command error (${zigbee.clusterLookup(descMap.clusterInt)}, command: 0x${commandId}) ${status}"
+                log.warn "zigbee command error (${clusterLookup(descMap.clusterInt)}, command: 0x${commandId}) ${status}"
             }
             break
     }
@@ -358,6 +368,15 @@ void parseOnOffCluster(Map descMap) {
             log.warn "zigbee received unknown ON_OFF_CLUSTER: ${descMap}"
             break
     }
+}
+
+private String clusterLookup(Integer clusterInt) {
+    String hex = "0x${intToHexStr(clusterInt, 2)}"
+    String name = zigbee.clusterLookup(clusterInt)
+    if (name) {
+        return name.replace('_', ' ') + " (${hex})"
+    }
+    return "CLUSTER ${hex}"
 }
 
 private void scheduleCommandTimeoutCheck(int delay = COMMAND_TIMEOUT) {
