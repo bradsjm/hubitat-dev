@@ -268,25 +268,12 @@ void parseElectricalMeasurementCluster(Map descMap) {
     long value = hexStrToUnsignedInt(descMap.value)
     switch (descMap.attrInt as Integer) {
         case AC_CURRENT_DIVISOR_ID:
-            state.attributes[(String)AC_CURRENT_DIVISOR_ID] = value
-            break
         case AC_CURRENT_MULTIPLIER_ID:
-            state.attributes[(String)AC_CURRENT_MULTIPLIER_ID] = value
-            break
         case AC_POWER_DIVISOR_ID:
-            state.attributes[(String)AC_POWER_DIVISOR_ID] = value
-            break
         case AC_POWER_MULTIPLIER_ID:
-            state.attributes[(String)AC_POWER_MULTIPLIER_ID] = value
-            break
         case AC_VOLTAGE_DIVISOR_ID:
-            state.attributes[(String)AC_VOLTAGE_DIVISOR_ID] = value
-            break
         case AC_VOLTAGE_MULTIPLIER_ID:
-            state.attributes[(String)AC_VOLTAGE_MULTIPLIER_ID] = value
-            break
-        case AC_POWER_MULTIPLIER_ID:
-            state.attributes[(String)AC_POWER_MULTIPLIER_ID] = value
+            state.attributes[descMap.attrInt as String] = value
             break
         case AC_FREQUENCY_ID:
             updateAttribute('frequency', value, 'Hz')
