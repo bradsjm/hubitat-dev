@@ -84,9 +84,6 @@ List<String> configure() {
         cmds += zigbee.writeAttribute(zigbee.ON_OFF_CLUSTER, POWER_RESTORE_ID, DataType.ENUM8, settings.powerRestore as Integer, [:], DELAY_MS)
     }
 
-    // Enables or Disables commands (e.g. on/off)
-    cmds += zigbee.writeAttribute(zigbee.BASIC_CLUSTER, DEVICE_ENABLED_ID, DataType.BOOLEAN, settings.disableOnOff ? 0 : 1, [:], DELAY_MS)
-
     if (settings.logEnable) { log.debug "zigbee configure cmds: ${cmds}" }
 
     runIn(2, 'refresh')
@@ -204,7 +201,7 @@ void parse(String description) {
     unschedule('deviceCommandTimeout')
 
     if (descMap.isClusterSpecific == false) {
-        log.trace "zigbee received message ${descMap}"
+        if (settings.logEnable) { log.trace "zigbee received message ${descMap}" }
         parseGlobalCommands(descMap)
         return
     }
@@ -212,7 +209,7 @@ void parse(String description) {
     if (settings.logEnable) {
         String clusterName = zigbee.clusterLookup(descMap.clusterInt)
         String attribute = descMap.attrId ? " attribute 0x${descMap.attrId} (value ${descMap.value})" : ''
-        log.trace "zigbee received ${clusterName} message" + attribute
+        if (settings.logEnable) { log.trace "zigbee received ${clusterName} message" + attribute }
     }
 
     switch (descMap.clusterInt as Integer) {
@@ -389,7 +386,6 @@ private void updateAttribute(String attribute, Object value, String unit = null)
 @Field static final int AC_VOLTAGE_DIVISOR_ID = 0x0601
 @Field static final int AC_VOLTAGE_MULTIPLIER_ID = 0x0600
 @Field static final int ACTIVE_POWER_ID = 0x050B
-@Field static final int DEVICE_ENABLED_ID = 0x0012
 @Field static final int FIRMWARE_VERSION_ID = 0x4000
 @Field static final int PING_ATTR_ID = 0x01
 @Field static final int POWER_ON_OFF_ID = 0x0000
