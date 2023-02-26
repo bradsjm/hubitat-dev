@@ -120,6 +120,7 @@ List<String> off() {
     if (settings.disableOnOff) { return [] }
     if (settings.txtEnable) { log.info 'turn off' }
     scheduleCommandTimeoutCheck()
+    state.isDigital = true
     return zigbee.off()
 }
 
@@ -127,6 +128,7 @@ List<String> on() {
     if (settings.disableOnOff) { return [] }
     if (settings.txtEnable) { log.info 'turn on' }
     scheduleCommandTimeoutCheck()
+    state.isDigital = true
     return zigbee.on()
 }
 
@@ -167,6 +169,11 @@ List<String> refresh() {
         ACTIVE_POWER_ID
     ], [:], DELAY_MS)
 
+    // Active Endpoint request
+    //cmds += "he raw ${device.deviceNetworkId} 0 0 0x0005 {00 ${zigbee.swapOctets(device.deviceNetworkId)}} {0x0000}"
+    // Simple discovery request
+    //cmds += "he raw ${device.deviceNetworkId} 0 0 0x0004 {00 ${zigbee.swapOctets(device.deviceNetworkId)}} {0x0000}"
+
     scheduleCommandTimeoutCheck()
     return cmds
 }
@@ -175,6 +182,7 @@ List<String> toggle() {
     if (settings.disableOnOff) { return [] }
     if (settings.txtEnable) { log.info 'toggle' }
     scheduleCommandTimeoutCheck()
+    state.isDigital = true
     return zigbee.command(zigbee.ON_OFF_CLUSTER, 0x02, [:], 0)
 }
 
@@ -255,7 +263,7 @@ void parseBasicCluster(Map descMap) {
             updateDataValue('softwareBuild', version)
             break
         default:
-            log.warn "zigbee received unknown BASIC_CLUSTER: ${descMap}"
+            log.warn "zigbee received unknown ${clusterLookup(descMap.clusterInt)}: ${descMap}"
             break
     }
 }
@@ -276,14 +284,14 @@ void parseElectricalMeasurementCluster(Map descMap) {
             state.attributes[descMap.attrInt as String] = value
             break
         case AC_FREQUENCY_ID:
-            updateAttribute('frequency', value, 'Hz')
+            updateAttribute('frequency', value, 'Hz', 'physical')
             break
         case RMS_CURRENT_ID:
             Integer multiplier = state.attributes[(String)AC_CURRENT_MULTIPLIER_ID]
             Integer divisor = state.attributes[(String)AC_CURRENT_DIVISOR_ID]
             if (multiplier > 0 && divisor > 0) {
                 BigDecimal result = value * multiplier / divisor
-                updateAttribute('amperage', result.setScale(1, RoundingMode.HALF_UP), 'A')
+                updateAttribute('amperage', result.setScale(1, RoundingMode.HALF_UP), 'A', 'physical')
             }
             break
         case ACTIVE_POWER_ID:
@@ -291,7 +299,7 @@ void parseElectricalMeasurementCluster(Map descMap) {
             Integer divisor = state.attributes[(String)AC_POWER_DIVISOR_ID]
             if (multiplier > 0 && divisor > 0) {
                 BigDecimal result = (int)value * multiplier / divisor
-                updateAttribute('power', result.setScale(1, RoundingMode.HALF_UP), 'W')
+                updateAttribute('power', result.setScale(1, RoundingMode.HALF_UP), 'W', 'physical')
             }
             break
         case RMS_VOLTAGE_ID:
@@ -299,11 +307,11 @@ void parseElectricalMeasurementCluster(Map descMap) {
             Integer divisor = state.attributes[(String)AC_VOLTAGE_DIVISOR_ID]
             if (multiplier > 0 && divisor > 0) {
                 BigDecimal result = value * multiplier / divisor
-                updateAttribute('voltage', result.setScale(1, RoundingMode.HALF_UP), 'V')
+                updateAttribute('voltage', result.setScale(1, RoundingMode.HALF_UP), 'V', 'physical')
             }
             break
         default:
-            log.warn "zigbee received unknown ELECTRICAL_MEASUREMENT_CLUSTER: ${descMap}"
+            log.warn "zigbee received unknown ${clusterLookup(descMap.clusterInt)}: ${descMap}"
             break
     }
 }
@@ -344,7 +352,9 @@ void parseGlobalCommands(Map descMap) {
 void parseOnOffCluster(Map descMap) {
     switch (descMap.attrInt as Integer) {
         case POWER_ON_OFF_ID:
-            updateAttribute('switch', descMap.value == '01' ? 'on' : 'off')
+            String type = state.isDigital == true ? 'digital' : 'physical'
+            state.remove('isDigital')
+            updateAttribute('switch', descMap.value == '01' ? 'on' : 'off', null, type)
             break
         case POWER_RESTORE_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
@@ -352,18 +362,16 @@ void parseOnOffCluster(Map descMap) {
             device.updateSetting('powerRestore', [value: value, type: 'number' ])
             break
         default:
-            log.warn "zigbee received unknown ON_OFF_CLUSTER: ${descMap}"
+            log.warn "zigbee received unknown ${clusterLookup(descMap.clusterInt)}: ${descMap}"
             break
     }
 }
 
-private String clusterLookup(Integer clusterInt) {
+private String clusterLookup(Object cluster) {
+    int clusterInt = cluster in String ? hexStrToUnsignedInt(cluster) : cluster.toInteger()
+    String label = zigbee.clusterLookup(clusterInt)?.clusterLabel
     String hex = "0x${intToHexStr(clusterInt, 2)}"
-    String name = zigbee.clusterLookup(clusterInt)
-    if (name) {
-        return name.replace('_', ' ') + " (${hex})"
-    }
-    return "CLUSTER ${hex}"
+    return label ? "${label} (${hex}) cluster" : "cluster ${hex}"
 }
 
 private void scheduleCommandTimeoutCheck(int delay = COMMAND_TIMEOUT) {
@@ -375,12 +383,12 @@ private void scheduleDeviceHealthCheck(int intervalMins) {
     schedule("${rnd.nextInt(59)} ${rnd.nextInt(9)}/${intervalMins} * ? * * *", 'ping')
 }
 
-private void updateAttribute(String attribute, Object value, String unit = null) {
+private void updateAttribute(String attribute, Object value, String unit = null, String type = null) {
     String descriptionText = "${attribute} was set to ${value}${unit ?: ''}"
     if (device.currentValue(attribute) != value && settings.txtEnable) {
         log.info descriptionText
     }
-    sendEvent(name: attribute, value: value, unit: unit, descriptionText: descriptionText)
+    sendEvent(name: attribute, value: value, unit: unit, type: type, descriptionText: descriptionText)
 }
 
 // Zigbee Attribute IDs
