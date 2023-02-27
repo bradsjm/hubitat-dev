@@ -427,7 +427,7 @@ private void getColorSchemeHandler(AsyncResponse response, Map data) {
             if (colorMap.level > settings.maxBright) { colorMap.level = settings.maxBright }
             if (state.lamps == null) { state.lamps = [:] }
             state.lamps[lamp.id] = colorMap
-            if (lamp && lamp.currentValue('switch', true) == 'on' || device.hasCommand('presetLevel')) {
+            if (lamp && lamp.currentValue('switch', true) == 'on' || lamp.hasCommand('presetLevel')) {
                 log.info "Set ${lamp} (Group ${data.group + 1}) to ${colorMap}"
                 lamp.setHue(colorMap.hue)
                 lamp.setSaturation(colorMap.saturation)
