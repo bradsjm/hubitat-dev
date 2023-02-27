@@ -30,7 +30,7 @@ import java.math.RoundingMode
 
 metadata {
     definition(name: 'Third Reality Power Meter Plug',
-            importUrl: 'https://raw.githubusercontent.com/bradsjm/hubitat-drivers/main/Zigbee/ThirdRealityPowerMonitorPlug.groovy',
+            importUrl: 'https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Zigbee/ThirdRealityPowerMonitorPlug.groovy',
             namespace: 'thirdreality', author: 'Jonathan Bradshaw') {
         capability 'Actuator'
         capability 'Configuration'
