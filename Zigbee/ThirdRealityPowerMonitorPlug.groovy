@@ -44,6 +44,7 @@ metadata {
         capability 'Switch'
         capability 'Voltage Measurement'
 
+        command 'resetEnergy'
         command 'toggle'
         command 'updateFirmware'
 
@@ -70,12 +71,11 @@ metadata {
     }
 }
 
-@Field static final String VERSION = '0.1'
+@Field static final String VERSION = '0.2'
 
 List<String> configure() {
     List<String> cmds = []
     log.info 'configure...'
-    state.clear()
     state.attributes = [:]
 
     // Power Restore Behavior
@@ -103,12 +103,13 @@ void deviceCommandTimeout() {
 void installed() {
     log.info 'installed'
     // populate some default values for attributes
-    sendEvent(name: 'switch', value: 'off')
     sendEvent(name: 'amperage', value: 0, unit: 'A')
-    sendEvent(name: 'voltage', value: 0, unit: 'V')
+    sendEvent(name: 'energy', value: 0, unit: 'kWh')
     sendEvent(name: 'frequency', value: 0, unit: 'Hz')
-    sendEvent(name: 'power', value: 0, unit: 'W')
     sendEvent(name: 'healthStatus', value: 'unknown')
+    sendEvent(name: 'power', value: 0, unit: 'W')
+    sendEvent(name: 'switch', value: 'off')
+    sendEvent(name: 'voltage', value: 0, unit: 'V')
 }
 
 void logsOff() {
@@ -176,6 +177,14 @@ List<String> refresh() {
 
     scheduleCommandTimeoutCheck()
     return cmds
+}
+
+void resetEnergy() {
+    log.info 'reset energy value'
+    unschedule('updateEnergyCalculation')
+    state.energyInKwh = 0
+    state.lastPowerUpdate = now()
+    updateEnergyCalculation()
 }
 
 List<String> toggle() {
@@ -298,6 +307,7 @@ void parseElectricalMeasurementCluster(Map descMap) {
             Integer multiplier = state.attributes[(String)AC_POWER_MULTIPLIER_ID]
             Integer divisor = state.attributes[(String)AC_POWER_DIVISOR_ID]
             if (multiplier > 0 && divisor > 0) {
+                unschedule('updateEnergyCalculation')
                 updateEnergyCalculation()
                 BigDecimal result = (int)value * multiplier / divisor
                 updateAttribute('power', result.setScale(1, RoundingMode.HALF_UP), 'W', 'physical')
