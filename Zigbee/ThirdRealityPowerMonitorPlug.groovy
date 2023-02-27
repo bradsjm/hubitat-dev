@@ -84,7 +84,7 @@ List<String> configure() {
     }
 
     cmds += zigbee.configureReporting(zigbee.ON_OFF_CLUSTER, POWER_ON_OFF_ID, DataType.BOOLEAN, 0, 3600, 1, [:], DELAY_MS)
-    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, ACTIVE_POWER_ID, DataType.INT16, 5, 60, 10, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, ACTIVE_POWER_ID, DataType.INT16, 5, 3600, 10, [:], DELAY_MS)
     cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_CURRENT_ID, DataType.UINT16, 5, 3600, 50, [:], DELAY_MS)
     cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_VOLTAGE_ID, DataType.UINT16, 5, 3600, 5, [:], DELAY_MS)
     cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, AC_FREQUENCY_ID, DataType.UINT16, 5, 3600, 1, [:], DELAY_MS)
@@ -401,10 +401,13 @@ private void updateEnergyCalculation() {
     BigDecimal energyInKwh = state.energyInKwh as BigDecimal ?: 0
     BigDecimal result = energyInKwh + calculateEnergyInKWh(powerInWatts, elapsedMs)
     state.energyInKwh = result
+    updateAttribute('energy', result.setScale(2, RoundingMode.HALF_UP), 'kWh', 'digital')
+    if (powerInWatts > 0) {
+        runIn(60, 'updateEnergyCalculation')
+    }
     if (settings.logEnable) {
         log.debug "updateEnergyCalculation { power=${powerInWatts}W, elapsedMs=${elapsedMs}, total kWh=${result} }"
     }
-    updateAttribute('energy', result.setScale(2, RoundingMode.HALF_UP), 'kWh', 'digital')
 }
 
 private BigDecimal calculateEnergyInKWh(BigDecimal currentPower, Long durationMs) {
