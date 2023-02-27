@@ -84,9 +84,9 @@ List<String> configure() {
     }
 
     cmds += zigbee.configureReporting(zigbee.ON_OFF_CLUSTER, POWER_ON_OFF_ID, DataType.BOOLEAN, 0, 3600, 1, [:], DELAY_MS)
-    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, ACTIVE_POWER_ID, DataType.INT16, 5, 3600, 10, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, ACTIVE_POWER_ID, DataType.INT16, 5, 60, 10, [:], DELAY_MS)
     cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_CURRENT_ID, DataType.UINT16, 5, 3600, 50, [:], DELAY_MS)
-    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_CURRENT_ID, DataType.UINT16, 5, 3600, 5, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, RMS_VOLTAGE_ID, DataType.UINT16, 5, 3600, 5, [:], DELAY_MS)
     cmds += zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, AC_FREQUENCY_ID, DataType.UINT16, 5, 3600, 1, [:], DELAY_MS)
 
     if (settings.logEnable) { log.debug "zigbee configure cmds: ${cmds}" }
@@ -298,6 +298,7 @@ void parseElectricalMeasurementCluster(Map descMap) {
             Integer multiplier = state.attributes[(String)AC_POWER_MULTIPLIER_ID]
             Integer divisor = state.attributes[(String)AC_POWER_DIVISOR_ID]
             if (multiplier > 0 && divisor > 0) {
+                updateEnergyCalculation()
                 BigDecimal result = (int)value * multiplier / divisor
                 updateAttribute('power', result.setScale(1, RoundingMode.HALF_UP), 'W', 'physical')
             }
@@ -389,6 +390,28 @@ private void updateAttribute(String attribute, Object value, String unit = null,
         log.info descriptionText
     }
     sendEvent(name: attribute, value: value, unit: unit, type: type, descriptionText: descriptionText)
+}
+
+private void updateEnergyCalculation() {
+    Long now = now()
+    Long lastUpdate = state.lastPowerUpdate as Long ?: now
+    Long elapsedMs = now - lastUpdate
+    state.lastPowerUpdate = now
+    BigDecimal powerInWatts = device.currentValue('power') as BigDecimal ?: 0
+    BigDecimal energyInKwh = state.energyInKwh as BigDecimal ?: 0
+    BigDecimal result = energyInKwh + calculateEnergyInKWh(powerInWatts, elapsedMs)
+    state.energyInKwh = result
+    if (settings.logEnable) {
+        log.debug "updateEnergyCalculation { power=${powerInWatts}W, elapsedMs=${elapsedMs}, total kWh=${result} }"
+    }
+    updateAttribute('energy', result.setScale(2, RoundingMode.HALF_UP), 'kWh', 'digital')
+}
+
+private BigDecimal calculateEnergyInKWh(BigDecimal currentPower, Long durationMs) {
+    BigDecimal powerInKw = currentPower / 1000
+    BigDecimal timeInHours = durationMs / (1000 * 60 * 60)
+    BigDecimal energyInKwh = powerInKw * timeInHours
+    return energyInKwh
 }
 
 // Zigbee Attribute IDs
