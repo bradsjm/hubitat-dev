@@ -225,7 +225,7 @@ void parse(String description) {
     unschedule('deviceCommandTimeout')
 
     if (descMap.isClusterSpecific == false) {
-        if (settings.logEnable) { log.trace "zigbee received message ${descMap}" }
+        if (settings.logEnable) { log.trace "zigbee received global message ${descMap}" }
         parseGlobalCommands(descMap)
         return
     }
@@ -239,16 +239,16 @@ void parse(String description) {
     switch (descMap.clusterInt as Integer) {
         case zigbee.BASIC_CLUSTER:
             parseBasicCluster(descMap)
-            descMap.additionalAttrs?.each { m -> parseBasicCluster(m) }
+            descMap.remove('additionalAttrs')?.each { m -> parseBasicCluster(descMap + m) }
             break
         case zigbee.ON_OFF_CLUSTER:
             parseOnOffCluster(descMap)
-            descMap.additionalAttrs?.each { m -> parseOnOffCluster(m) }
+            descMap.remove('additionalAttrs')?.each { m -> parseOnOffCluster(descMap + m) }
             break
         case zigbee.ELECTRICAL_MEASUREMENT_CLUSTER:
             if (state.attributes == null) { state.attributes = [:] }
             parseElectricalMeasurementCluster(descMap)
-            descMap.additionalAttrs?.each { m -> parseElectricalMeasurementCluster(m) }
+            descMap.remove('additionalAttrs')?.each { m -> parseElectricalMeasurementCluster(descMap + m) }
             break
         default:
             if (settings.logEnable) {
