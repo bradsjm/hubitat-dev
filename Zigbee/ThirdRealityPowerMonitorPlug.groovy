@@ -19,9 +19,6 @@
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  *  SOFTWARE.
- *
- *  Thanks to the Zigbee2Mqtt and Dresden-elektronik teams for
- *  their existing work in decoding the Hue protocol.
  */
 
 import groovy.transform.Field
