@@ -21,9 +21,17 @@
  *  SOFTWARE.
  *
  *  Thanks to the Zigbee2Mqtt and Dresden-elektronik teams for
- *  their existing work in decoding the Hue protocol.
+ *  their existing work in decoding the FP1's protocol.
+ *
+ *  Region encoding and decoding courtesy of Otnow:
+ *  https://github.com/dresden-elektronik/deconz-rest-plugin/issues/5928#issuecomment-1166545226
  */
 
+/**
+ *  1. Aqara states that sensor needs about 6s to detect presence (whether person stays or not)
+ *  2. It determines within 30s that a person is no longer there
+ *  3. 'Enter' should be PIR-like, which means as soon as sensors sees something
+ */
 import groovy.transform.Field
 import hubitat.helper.HexUtils
 import hubitat.zigbee.zcl.DataType
@@ -36,39 +44,35 @@ metadata {
         capability 'Health Check'
         capability 'Motion Sensor'
         capability 'Presence Sensor'
-        capability 'Refresh'
         capability 'Sensor'
 
         command 'resetPresence'
-        command 'removeAllRegions'
-        command 'removeInterferenceRegion'
-        command 'removeRegion', [
-            [ name: 'Region Id*', type: 'NUMBER', description: 'Region ID (1-10)' ]
-        ]
-        command 'setRegion', [
-            [ name: 'Region Id*', type: 'NUMBER', description: 'Region ID (1-10)' ],
-            [ name: 'Horizontal*', type: 'STRING', description: 'Left, Right (where 1 is left and 4 is right)' ],
-            [ name: 'Vertical*', type: 'STRING', description: 'Top, Bottom (where 1 is top and 7 is bottom)' ],
-        ]
-        command 'setInterferenceRegion', [
-            [ name: 'Horizontal*', type: 'STRING', description: 'Left, Right (where 1 is left and 4 is right)' ],
-            [ name: 'Vertical*', type: 'STRING', description: 'Top, Bottom (where 1 is top and 7 is bottom)' ]
-        ]
 
         attribute 'healthStatus', 'enum', [ 'unknown', 'offline', 'online' ]
-        attribute 'activity', 'enum', [ 'enter', 'leave', 'enter left', 'leave right', 'enter right', 'leave left', 'approach', 'away' ]
+        attribute 'activity', 'enum', PRESENCE_ACTIONS.values() as List<String>
         attribute 'regionNumber', 'number'
-        attribute 'regionAction', 'enum', [ 'enter', 'leave', 'occupied', 'unoccupied' ]
+        attribute 'regionAction', 'enum', REGION_ACTIONS.values() as List<String>
 
         fingerprint model: 'lumi.motion.ac01', manufacturer: 'aqara', profileId: '0104', endpointId: '01', inClusters: '0000,0003,FCC0', outClusters: '0003,0019', application: '36'
     }
 
     preferences {
-        input name: 'triggerDistance', type: 'enum', title: '<b>Trigger Distance</b>', options: TriggerDistanceOpts.options, defaultValue: TriggerDistanceOpts.defaultValue, description:\
-            '<i>Detection distance for approaching sensor.</i>'
+        input name: 'approachDistance', type: 'enum', title: '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description:\
+            '<i>Sets maximum distance for detecting approach vs away.</i>'
 
         input name: 'sensitivityLevel', type: 'enum', title: '<b>Motion Sensitivity</b>', options: SensitivityLevelOpts.options, defaultValue: SensitivityLevelOpts.defaultValue, description:\
-            '<i>Motion detection sensitivity within detection zone.</i>'
+            '<i>Sets sensitivity of human body recognition.</i>'
+
+        input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description:\
+            '<i>Sets the direction detection capabilities.</i>'
+
+        (1..10).each { int id ->
+            input name: "detectionRegion${id}", type: 'text', title: "<b>Detection Region #${id}</b>", description: \
+                "<i>Set detection grid for <a href=\'${GRID_IMG_HREF}\' target='_blank'>region ${id}</a> (top, bottom, left, right)</i>"
+        }
+
+        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid Region</b>', defaultValue: '1,7,0,0', description: \
+            "<i>Optional interference <a href=\'${GRID_IMG_HREF}\' target='_blank'>region</a> (top, bottom, left, right)</i>"
 
         input name: 'healthCheckInterval', type: 'enum', title: '<b>Healthcheck Interval</b>', options: HealthcheckIntervalOpts.options, defaultValue: HealthcheckIntervalOpts.defaultValue, description:\
             '<i>Changes how often the hub pings sensor to check health.</i>'
@@ -81,29 +85,54 @@ metadata {
     }
 }
 
+@Field static final String GRID_IMG_HREF = 'https://smarthomescene.com/wp-content/uploads/2023/02/aqara-fp1-regions-zigbee2mqtt-zone-grid.jpg'
+
 @Field static final String VERSION = '0.1'
 
 List<String> configure() {
     List<String> cmds = []
     log.info 'configure...'
-    state.clear()
 
     // Set motion sensitivity
     if (settings.sensitivityLevel) {
-        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, settings.sensitivityLevel as Integer, [:], DELAY_MS)
+        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, settings.sensitivityLevel as Integer, MFG_CODE, DELAY_MS)
     }
 
     // Set trigger distance
-    if (settings.triggerDistance) {
-        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, settings.triggerDistance as Integer, [:], DELAY_MS)
+    if (settings.approachDistance) {
+        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, settings.approachDistance as Integer, MFG_CODE, DELAY_MS)
     }
 
     // Enable left right detection
-    cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, 0x01, [:], DELAY_MS)
+    if (settings.directionMode) {
+        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, settings.directionMode as Integer, MFG_CODE, DELAY_MS)
+    }
+
+    // Set detection regions
+    (1..10).each { int id ->
+        if (settings["detectionRegion${id}"]) {
+            cmds += setDetectionRegion(id, settings["detectionRegion${id}"].tokenize(',') as int[])
+        } else {
+            cmds += setDetectionRegion(id, 1, 7, 0, 0)
+        }
+    }
+
+    // Set interference region
+    if (settings.interferenceRegion) {
+        cmds += setInterferenceRegion(settings.interferenceRegion.tokenize(',') as int[])
+    } else {
+        cmds += setInterferenceRegion(1, 7, 0, 0)
+    }
+
+    // Get configuration
+    cmds += zigbee.readAttribute(XIAOMI_CLUSTER_ID, [
+        SENSITIVITY_LEVEL_ATTR_ID,
+        TRIGGER_DISTANCE_ATTR_ID,
+        DIRECTION_MODE_ATTR_ID,
+    ], MFG_CODE, DELAY_MS)
 
     if (settings.logEnable) { log.debug "zigbee configure cmds: ${cmds}" }
 
-    runIn(2, 'refresh')
     return cmds
 }
 
@@ -213,12 +242,14 @@ void parseXiaomiCluster(Map descMap) {
     switch (descMap.attrInt as Integer) {
         case PRESENCE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
+            if (settings.logEnable) { log.debug "xiaomi: presence attribute is ${value}" }
             updateAttribute('presence', value == 0 ? 'not present' : 'present')
             break
-        case PRESENCE_EVENT_ATTR_ID:
+        case PRESENCE_ACTIONS_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
+            if (settings.logEnable) { log.debug "xiaomi: action attribute is ${value}" }
             if (value <= 7) {
-                String activity = [ 'enter', 'leave', 'enter left', 'leave right', 'enter right', 'leave left', 'approach', 'away' ].get(value)
+                String activity = PRESENCE_ACTIONS.get(value)
                 updateAttribute('activity', activity)
                 updateAttribute('motion', value in [0, 2, 4, 6, 7] ? 'active' : 'inactive')
             } else {
@@ -228,8 +259,8 @@ void parseXiaomiCluster(Map descMap) {
         case REGION_EVENT_ATTR_ID:
             Integer regionId = HexUtils.hexStringToInt(descMap.value[0..1])
             Integer value = HexUtils.hexStringToInt(descMap.value[2..3])
-            String regionAction = [ 1: 'enter', 2: 'leave', 4: 'occupied', 8: 'unoccupied' ].get(value)
-            if (settings.logEnable) { log.debug "region ${regionId} event ${regionAction}" }
+            String regionAction = REGION_ACTIONS.get(value)
+            if (settings.logEnable) { log.debug "xiaomi: region ${regionId} action is ${value}" }
             updateAttribute('regionNumber', regionId)
             updateAttribute('regionAction', regionAction)
             break
@@ -240,21 +271,19 @@ void parseXiaomiCluster(Map descMap) {
             break
         case TRIGGER_DISTANCE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
-            log.info "trigger distance is '${TriggerDistanceOpts.options[value]}' (0x${descMap.value})"
-            device.updateSetting('triggerDistance', [value: value.toString(), type: 'enum' ])
+            log.info "trigger distance is '${ApproachDistanceOpts.options[value]}' (0x${descMap.value})"
+            device.updateSetting('approachDistance', [value: value.toString(), type: 'enum' ])
+            break
+        case DIRECTION_MODE_ATTR_ID:
+            Integer value = hexStrToUnsignedInt(descMap.value)
+            log.info "monitoring direction mode is '${DirectionModeOpts.options[value]}' (0x${descMap.value})"
+            device.updateSetting('directionMode', [value: value.toString(), type: 'enum' ])
             break
         case XIAOMI_TAGS_ATTR_ID:
             Map tags = decodeXiaomiTags(descMap.value)
-            log.debug tags
-            if (tags[0x03]) {
-                log.debug "temperature ${convertTemperatureIfNeeded(tags[0x03], 'C', 1)}"
-            }
-            if (tags[0x05]) {
-                log.debug "RSSI -${tags[0x05]}dBm"
-            }
-            if (tags[0x08]) {
-                String swBuild = '0.0.0_' + (tags[0x08] & 0xFF).toString().padLeft(4, '0')
-                log.debug "swBuild ${swBuild}"
+            if (tags[SWBUILD_TAG_ID]) {
+                String swBuild = (tags[SWBUILD_TAG_ID] & 0xFF).toString().padLeft(4, '0')
+                device.updateDataValue('softwareBuild', swBuild)
             }
             break
         default:
@@ -270,84 +299,14 @@ List<String> ping() {
     return zigbee.readAttribute(zigbee.BASIC_CLUSTER, PING_ATTR_ID, [:], 0)
 }
 
-List<String> refresh() {
-    log.info 'refresh'
-    List<String> cmds = []
-
-    // Get configuration
-    cmds += zigbee.readAttribute(XIAOMI_CLUSTER_ID, [
-        SENSITIVITY_LEVEL_ATTR_ID,
-        TRIGGER_DISTANCE_ATTR_ID,
-        PRESENCE_ATTR_ID,
-        PRESENCE_EVENT_ATTR_ID
-    ], [:], DELAY_MS)
-    scheduleCommandTimeoutCheck()
-    return cmds
-}
-
-List<String> removeAllRegions() {
-    log.info 'remove all regions'
-    device.deleteCurrentState('regionNumber')
-    device.deleteCurrentState('regionAction')
-    return (1..10).collectMany { id -> removeRegion(id) }
-}
-
-List<String> removeInterferenceRegion() {
-    return setInterferenceRegion('0,0', '1,7')
-}
-
-List<String> removeRegion(BigDecimal regionId) {
-    if (regionId < 1 || regionId > 10) { log.error 'region must be between 1 and 10'; return [] }
-    String octetStr = '07020' + HEX_CHARS[(int)regionId] + '0000000000'
-    if (settings.logEnable) { log.debug "remove region ${regionId} = ${octetStr}" }
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, 0x41, octetStr, [:], DELAY_MS)
-}
-
 List<String> resetPresence() {
     log.info 'reset presence'
     updateAttribute('motion', 'inactive')
     updateAttribute('presence', 'not present')
     updateAttribute('activity', 'leave')
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, RESET_PRESENCE_ATTR_ID, DataType.UINT8, 0x00, [:], 0)
-}
-
-List<String> setInterferenceRegion(String horizontal, String vertical) {
-    String value = convertToRegionHex(horizontal, vertical)
-    if (settings.logEnable) { log.debug "set interference region = ${value}" }
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_INTERFERENCE_ATTR_ID, DataType.UINT32, value, [:], 0)
-}
-
-List<String> setRegion(BigDecimal regionId, String horizontal, String vertical) {
-    Integer[] x = horizontal.tokenize(',-') as Integer[]
-    Integer[] y = vertical.tokenize(',-') as Integer[]
-    if (regionId < 1 || regionId > 10) {
-        log.error 'region must be between 1 and 10'
-        return []
-    }
-    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < 0 || x[1] > 4) {
-        log.error("Invalid horizontal value: ${horizontal}")
-        return []
-    }
-    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < 1 || y[1] > 7) {
-        log.error("Invalid vertical value: ${vertical}")
-        return []
-    }
-    log.info "setting region ${regionId} grid {top=${y[0]}, bottom=${y[1]}, left=${x[0]}, right=${x[1]}}"
-    int[] matrix = calculateMatrix(y[0], y[1], x[0], x[1])
-    StringBuilder sb = new StringBuilder()
-    sb.append('07010')
-        .append(HEX_CHARS[(int)regionId])
-        .append(HEX_CHARS[matrix[1]])
-        .append(HEX_CHARS[matrix[0]])
-        .append(HEX_CHARS[matrix[3]])
-        .append(HEX_CHARS[matrix[2]])
-        .append(HEX_CHARS[matrix[5]])
-        .append(HEX_CHARS[matrix[4]])
-        .append('0')
-        .append(HEX_CHARS[matrix[6]])
-        .append('FF')
-    if (settings.logEnable) { log.debug "set region ${regionId} = ${sb}" }
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, 0x41, sb.toString(), [:], 0)
+    device.deleteCurrentState('regionNumber')
+    device.deleteCurrentState('regionAction')
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, RESET_PRESENCE_ATTR_ID, DataType.UINT8, 0x01, MFG_CODE, 0)
 }
 
 void updated() {
@@ -369,11 +328,60 @@ void updated() {
     runIn(1, 'configure')
 }
 
-private int[] calculateMatrix(int top, int bottom, int left, int right) {
+/**
+ *  Calculates the set of values that make up a boxed region specified by
+ *  the top, bottom, left and right parameters and returns an array of 7 rows
+ *  used by the Aqara FP1 region operations. If left and right are passed in
+ *  as zero then it is assumed the matrix should be blank.
+ *
+ *      X1 X2 X3 X4
+ *  Y1 | 1| 2| 4| 8|
+ *  Y2 | 1| 2| 4| 8|
+ *  Y3 | 1| 2| 4| 8|
+ *  Y4 | 1| 2| 4| 8|
+ *  Y5 | 1| 2| 4| 8|
+ *  Y6 | 1| 2| 4| 8|
+ *  Y7 | 1| 2| 4| 8|
+ */
+private static char[] calculateBoxedRegionArray(int top, int bottom, int left, int right) {
     int total = left + right > 0 ? (1 << right) - (1 << (left - 1)) : 0
-    int[] results = new int[7]
-    for (int i = top - 1; i < bottom; i++) { results[i] = total }
+    char[] results = new char[7]
+    for (int i = top - 1; i < bottom; i++) { results[i] = HEX_CHARS[total] }
     return results
+}
+
+/**
+ *  Calculates the region value for a boxed region specified by
+ *  the given horizontal (X) and vertical (Y) parameters that is
+ *  used by the Aqara FP1 region operations.
+ */
+private static String calculateBoxedRegionHex(int[] x, int[] y) {
+    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < x[0] || x[1] > 4) {
+        return ''
+    }
+    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < y[0] || y[1] > 7) {
+        return ''
+    }
+    char[] matrix = calculateBoxedRegionArray(y[0], y[1], x[0], x[1]) // top, bottom, left, right
+    StringBuilder hexString = new StringBuilder('0')
+    for (int i = matrix.length - 1; i >= 0; i--) {
+        hexString.append(matrix[i])
+    }
+    return hexString.toString()
+}
+
+/**
+ *  Reads a specified number of little-endian bytes from a given
+ *  ByteArrayInputStream and returns a BigInteger.
+ */
+private static BigInteger readBigIntegerBytes(ByteArrayInputStream stream, int length) {
+    byte[] byteArr = new byte[length]
+    stream.read(byteArr, 0, length)
+    BigInteger bigInt = BigInteger.ZERO
+    for (int i = byteArr.length - 1; i >= 0; i--) {
+        bigInt = bigInt | (BigInteger.valueOf((byteArr[i] & 0xFF) << (8 * i)))
+    }
+    return bigInt
 }
 
 private String clusterLookup(Object cluster) {
@@ -386,49 +394,35 @@ private String clusterLookup(Object cluster) {
     return 'unknown'
 }
 
-private String convertToRegionHex(String horizontal, String vertical) {
-    Integer[] x = horizontal.tokenize(',-') as Integer[]
-    Integer[] y = vertical.tokenize(',-') as Integer[]
-    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < 0 || x[1] > 4) {
-        log.error("Invalid horizontal value: ${horizontal}")
-        return ''
+/**
+ *  Decodes a Xiaomi Zigbee cluster attribute payload in hexadecimal format and
+ *  returns a map of decoded tag number and value pairs where the value is either a
+ *  BigInteger for discreet values or a String for variable length.
+ */
+private Map<Integer, Object> decodeXiaomiTags(String hexString) {
+    Map<Integer, Object> results = [:]
+    byte[] bytes = HexUtils.hexStringToByteArray(hexString)
+    new ByteArrayInputStream(bytes).withCloseable { stream ->
+        while (stream.available() > 2) {
+            int tag = stream.read()
+            int dataType = stream.read()
+            Object value
+            if (DataType.isDiscrete(dataType)) {
+                int length = stream.read()
+                byte[] byteArr = new byte[length]
+                stream.read(byteArr, 0, length)
+                value = new String(byteArr)
+            } else {
+                int length = DataType.getLength(dataType)
+                value = readBigIntegerBytes(stream, length)
+            }
+            results[tag] = value
+            if (settings.logEnable) {
+                log.debug "Xiaomi decode tag=0x${HexUtils.integerToHexString(tag, 2)}, dataType=0x${HexUtils.integerToHexString(dataType, 2)}, value=${value}"
+            }
+        }
     }
-    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < 1 || y[1] > 7) {
-        log.error("Invalid vertical value: ${vertical}")
-        return ''
-    }
-    log.info "setting interference region grid {top=${y[0]}, bottom=${y[1]}, left=${x[0]}, right=${x[1]}}"
-    int[] matrix = calculateMatrix(y[0], y[1], x[0], x[1])
-    StringBuilder hexString = new StringBuilder('0')
-    for (int i = matrix.length - 1; i >= 0; i--) {
-        hexString.append(HEX_CHARS[matrix[i]])
-    }
-    return hexString.toString()
-}
-
-private Map decodeXiaomiTags(String hexString) {
-    Map results = [:]
-    ByteArrayInputStream stream = new ByteArrayInputStream(HexUtils.hexStringToByteArray(hexString))
-    while (stream.available() > 2) {
-        int tag = stream.read()
-        int dataType = stream.read()
-        int length = DataType.getLength(dataType)
-        BigInteger value = readLittleEndianBytes(stream, length)
-        log.debug "tag=0x${HexUtils.integerToHexString(tag, 2)}, dataType=0x${HexUtils.integerToHexString(dataType, 2)}, value=${value}"
-        results[tag] = value
-    }
-    stream.close()
     return results
-}
-
-private BigInteger readLittleEndianBytes(ByteArrayInputStream stream, int length) {
-    byte[] byteArr = new byte[length]
-    stream.read(byteArr, 0, length)
-    BigInteger bigInt = BigInteger.ZERO
-    for (int i = byteArr.length - 1; i >= 0; i--) {
-        bigInt = bigInt | (BigInteger.valueOf((byteArr[i] & 0xFF) << (8 * i)))
-    }
-    return bigInt
 }
 
 private void scheduleCommandTimeoutCheck(int delay = COMMAND_TIMEOUT) {
@@ -440,6 +434,58 @@ private void scheduleDeviceHealthCheck(int intervalMins) {
     schedule("${rnd.nextInt(59)} ${rnd.nextInt(9)}/${intervalMins} * ? * * *", 'ping')
 }
 
+private List<String> setDetectionRegion(int regionId, int... box) {
+    int[] y = box[0..1] as int[]
+    int[] x = box[2..3] as int[]
+    if (regionId < 1 || regionId > 10) {
+        log.error 'region must be between 1 and 10'
+        return []
+    }
+    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < x[0] || x[1] > 4) {
+        log.error("Invalid horizontal value: ${x}")
+        return []
+    }
+    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < y[0] || y[1] > 7) {
+        log.error("Invalid vertical value: ${y}")
+        return []
+    }
+
+    String octetStr
+    if (x[0] == 0 && x[1] == 0) { // remove region
+        octetStr = '07020' + HEX_CHARS[(int)regionId] + '0000000000'
+    } else {
+        char[] matrix = calculateBoxedRegionArray(y[0], y[1], x[0], x[1])
+        octetStr = new StringBuilder()
+            .append('07010')
+            .append(HEX_CHARS[(int)regionId])
+            .append(matrix[1])
+            .append(matrix[0])
+            .append(matrix[3])
+            .append(matrix[2])
+            .append(matrix[5])
+            .append(matrix[4])
+            .append('0')
+            .append(matrix[6])
+            .append('FF')
+    }
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, DataType.STRING_OCTET, octetStr, MFG_CODE, DELAY_MS)
+}
+
+private List<String> setInterferenceRegion(int... box) {
+    int[] y = box[0..1] as int[]
+    int[] x = box[2..3] as int[]
+    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < x[0] || x[1] > 4) {
+        log.error("Invalid horizontal value: ${x}")
+        return []
+    }
+    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < y[0] || y[1] > 7) {
+        log.error("Invalid vertical value: ${y}")
+        return []
+    }
+    String value = calculateBoxedRegionHex(x, y)
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_INTERFERENCE_ATTR_ID, DataType.UINT32, value, MFG_CODE, DELAY_MS)
+}
+
 private void updateAttribute(String attribute, Object value, String unit = null, String type = 'digital') {
     String descriptionText = "${attribute} was set to ${value}${unit ?: ''}"
     if (device.currentValue(attribute) != value && settings.txtEnable) {
@@ -448,11 +494,20 @@ private void updateAttribute(String attribute, Object value, String unit = null,
     sendEvent(name: attribute, value: value, unit: unit, type: type, descriptionText: descriptionText)
 }
 
-// Zigbee Attribute IDs
+// Hex characters used for conversion
+@Field static final char[] HEX_CHARS = '0123456789ABCDEF'.toCharArray()
+
+// Set of Presence Actions
+@Field static final Map<Integer, String> PRESENCE_ACTIONS = [ 0: 'enter', 1: 'leave', 2: 'enter (left)', 3: 'leave (right)', 4: 'enter (right)', 5: 'leave (left)', 6: 'closer', 7: 'away' ]
+
+// Set of Region Actions
+@Field static final Map<Integer, String> REGION_ACTIONS = [ 1: 'enter', 2: 'leave', 4: 'occupied', 8: 'unoccupied' ]
+
+// Zigbee Cluster, Attribute and Xiaomi Tag IDs
 @Field static final int DIRECTION_MODE_ATTR_ID = 0x0144
 @Field static final int PING_ATTR_ID = 0x01
 @Field static final int PRESENCE_ATTR_ID = 0x0142
-@Field static final int PRESENCE_EVENT_ATTR_ID = 0x0143
+@Field static final int PRESENCE_ACTIONS_ATTR_ID = 0x0143
 @Field static final int REGION_EVENT_ATTR_ID = 0x0151
 @Field static final int RESET_PRESENCE_ATTR_ID = 0x0157
 @Field static final int SENSITIVITY_LEVEL_ATTR_ID = 0x010C
@@ -460,27 +515,32 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final int SET_EXIT_REGION_ATTR_ID = 0x0153
 @Field static final int SET_INTERFERENCE_ATTR_ID = 0x0154
 @Field static final int SET_REGION_ATTR_ID = 0x0150
+@Field static final int SWBUILD_TAG_ID = 0x08
 @Field static final int TRIGGER_DISTANCE_ATTR_ID = 0x0146
 @Field static final int XIAOMI_TAGS_ATTR_ID = 0x00F7
 @Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
-@Field static final int XIAOMI_VENDOR = 0x1037
+@Field static final Map MFG_CODE = [ mfgCode: 0x115F ]
 
-@Field static Map TriggerDistanceOpts = [
+// Configuration options
+@Field static final Map ApproachDistanceOpts = [
     defaultValue: 0x00,
-    options: [ 0x00: 'Far', 0x01: 'Medium', 0x02: 'Near' ]
+    options: [ 0x00: 'Far (3m)', 0x01: 'Medium (2m)', 0x02: 'Near (1m)' ]
 ]
 
-@Field static Map SensitivityLevelOpts = [
+@Field static final Map SensitivityLevelOpts = [
     defaultValue: 0x03,
     options: [ 0x01: 'Low', 0x02: 'Medium', 0x03: 'High' ]
 ]
 
-@Field static Map HealthcheckIntervalOpts = [
+@Field static final Map DirectionModeOpts = [
+    defaultValue: 0x00,
+    options: [ 0x00: 'Undirected Enter/Leave', 0x01: 'Left & Right Enter/Leave' ]
+]
+
+@Field static final Map HealthcheckIntervalOpts = [
     defaultValue: 10,
     options: [ 10: 'Every 10 Mins', 15: 'Every 15 Mins', 30: 'Every 30 Mins', 45: 'Every 45 Mins', 59: 'Every Hour', 00: 'Disabled' ]
 ]
-
-@Field static char[] HEX_CHARS = '0123456789ABCDEF'.toCharArray()
 
 // Command timeout before setting healthState to offline
 @Field static final int COMMAND_TIMEOUT = 10
