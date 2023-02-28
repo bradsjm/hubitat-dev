@@ -243,22 +243,18 @@ void parseXiaomiCluster(Map descMap) {
             log.info "trigger distance is '${TriggerDistanceOpts.options[value]}' (0x${descMap.value})"
             device.updateSetting('triggerDistance', [value: value.toString(), type: 'enum' ])
             break
-        case XIAOMI_ATTR_ID:
-            if (descMap.value?.size() > 3) {
-                ByteArrayInputStream stream = new ByteArrayInputStream(HexUtils.hexStringToByteArray(descMap.value))
-                Map tags = decodeXiaomiStream(stream)
-                stream.close()
-                log.debug results
-                if (tags[0x03]) {
-                    log.debug "temperature ${convertTemperatureIfNeeded(tags[0x03], 'C', 1)}"
-                }
-                if (tags[0x05]) {
-                    log.debug "RSSI -${tags[0x05]}dBm"
-                }
-                if (tags[0x08]) {
-                    String swBuild = '0.0.0_' + (tags[0x08] & 0xFF).toString().padLeft(4, '0')
-                    log.debug "swBuild ${swBuild}"
-                }
+        case XIAOMI_TAGS_ATTR_ID:
+            Map tags = decodeXiaomiTags(descMap.value)
+            log.debug tags
+            if (tags[0x03]) {
+                log.debug "temperature ${convertTemperatureIfNeeded(tags[0x03], 'C', 1)}"
+            }
+            if (tags[0x05]) {
+                log.debug "RSSI -${tags[0x05]}dBm"
+            }
+            if (tags[0x08]) {
+                String swBuild = '0.0.0_' + (tags[0x08] & 0xFF).toString().padLeft(4, '0')
+                log.debug "swBuild ${swBuild}"
             }
             break
         default:
@@ -316,7 +312,7 @@ List<String> resetPresence() {
 }
 
 List<String> setInterferenceRegion(String horizontal, String vertical) {
-    String value = getRegionHex(horizontal, vertical)
+    String value = convertToRegionHex(horizontal, vertical)
     if (settings.logEnable) { log.debug "set interference region = ${value}" }
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_INTERFERENCE_ATTR_ID, DataType.UINT32, value, [:], 0)
 }
@@ -390,64 +386,7 @@ private String clusterLookup(Object cluster) {
     return 'unknown'
 }
 
-private Map decodeXiaomiStream(ByteArrayInputStream stream) {
-    Map results = [:]
-    while (stream.available()) {
-        int tag = stream.read()
-        int dataType = stream.read()
-        BigInteger value
-        switch (dataType) {
-            case 0x08 : // 8 bit data
-            case 0x10 : // 8-bit boolean
-            case 0x18 : // 8-bit bitmap
-            case 0x20 : // 8-bit unsigned int
-            case 0x28 : // 8-bit signed int
-            case 0x30 : // 8-bit enumeration
-                value = new BigInteger(stream.read())
-                break
-            case 0x21 : // 16-bit unsigned int
-                value = readBytes(stream, 2)
-                break
-            case 0x0B : // 32-bit data
-            case 0x1B : // 32-bit bitmap
-            case 0x23 : // 32-bit unsigned int
-            case 0x2B : // 32-bit signed int
-                value = readBytes(stream, 4)
-                break
-            case 0x24 : // 40-bit Zcl40BitUint tag == 0x06 -> LQI (?)
-            case 0x0C : // 40-bit data
-            case 0x1C : // 40-bit bitmap
-            case 0x24 : // 40-bit unsigned int
-            case 0x2C : // 40-bit signed int
-                value = readBytes(stream, 5)
-                break
-            case 0x0D : // 48-bit data
-            case 0x1D : // 48-bit bitmap
-            case 0x25 : // 48-bit unsigned int
-            case 0x2D : // 48-bit signed integer
-                value = readBytes(stream, 6)
-                break
-            default:
-                log.error "unknown data type ${dataType}"
-                break
-        }
-        log.debug "tag=0x${HexUtils.integerToHexString(tag, 2)}, dataType=0x${HexUtils.integerToHexString(dataType, 2)}, value=${value}"
-        results[tag] = value
-    }
-    return results
-}
-
-private BigInteger readBytes(ByteArrayInputStream stream, int length) {
-    byte[] byteArr = new byte[length]
-    stream.read(byteArr, 0, length)
-    BigInteger bigInt = BigInteger.ZERO
-    for (int i = byteArr.length - 1; i >= 0; i--) {
-        bigInt = bigInt | (BigInteger.valueOf((byteArr[i] & 0xFF) << (8 * i)))
-    }
-    return bigInt
-}
-
-private String getRegionHex(String horizontal, String vertical) {
+private String convertToRegionHex(String horizontal, String vertical) {
     Integer[] x = horizontal.tokenize(',-') as Integer[]
     Integer[] y = vertical.tokenize(',-') as Integer[]
     if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < 0 || x[1] > 4) {
@@ -465,6 +404,31 @@ private String getRegionHex(String horizontal, String vertical) {
         hexString.append(HEX_CHARS[matrix[i]])
     }
     return hexString.toString()
+}
+
+private Map decodeXiaomiTags(String hexString) {
+    Map results = [:]
+    ByteArrayInputStream stream = new ByteArrayInputStream(HexUtils.hexStringToByteArray(hexString))
+    while (stream.available() > 2) {
+        int tag = stream.read()
+        int dataType = stream.read()
+        int length = DataType.getLength(dataType)
+        BigInteger value = readLittleEndianBytes(stream, length)
+        log.debug "tag=0x${HexUtils.integerToHexString(tag, 2)}, dataType=0x${HexUtils.integerToHexString(dataType, 2)}, value=${value}"
+        results[tag] = value
+    }
+    stream.close()
+    return results
+}
+
+private BigInteger readLittleEndianBytes(ByteArrayInputStream stream, int length) {
+    byte[] byteArr = new byte[length]
+    stream.read(byteArr, 0, length)
+    BigInteger bigInt = BigInteger.ZERO
+    for (int i = byteArr.length - 1; i >= 0; i--) {
+        bigInt = bigInt | (BigInteger.valueOf((byteArr[i] & 0xFF) << (8 * i)))
+    }
+    return bigInt
 }
 
 private void scheduleCommandTimeoutCheck(int delay = COMMAND_TIMEOUT) {
@@ -497,7 +461,7 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final int SET_INTERFERENCE_ATTR_ID = 0x0154
 @Field static final int SET_REGION_ATTR_ID = 0x0150
 @Field static final int TRIGGER_DISTANCE_ATTR_ID = 0x0146
-@Field static final int XIAOMI_ATTR_ID = 0x00F7
+@Field static final int XIAOMI_TAGS_ATTR_ID = 0x00F7
 @Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
 @Field static final int XIAOMI_VENDOR = 0x1037
 
