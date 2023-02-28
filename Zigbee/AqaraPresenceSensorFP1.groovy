@@ -58,13 +58,13 @@ metadata {
 
     preferences {
         input name: 'approachDistance', type: 'enum', title: '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description:\
-            '<i>Sets maximum distance for detecting approach vs away.</i>'
+            '<i>Maximum distance for detecting approach vs away.</i>'
 
         input name: 'sensitivityLevel', type: 'enum', title: '<b>Motion Sensitivity</b>', options: SensitivityLevelOpts.options, defaultValue: SensitivityLevelOpts.defaultValue, description:\
-            '<i>Sets sensitivity of human body recognition.</i>'
+            '<i>Sensitivity of movement detection.</i>'
 
         input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description:\
-            '<i>Sets the direction detection capabilities.</i>'
+            '<i>Enables direction detection capabilities.</i>'
 
         (1..10).each { int id ->
             input name: "detectionRegion${id}", type: 'text', title: "<b>Detection Region #${id}</b>", description: \
