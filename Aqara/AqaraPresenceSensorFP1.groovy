@@ -50,8 +50,16 @@ metadata {
 
         attribute 'healthStatus', 'enum', [ 'unknown', 'offline', 'online' ]
         attribute 'activity', 'enum', PRESENCE_ACTIONS.values() as List<String>
-        attribute 'regionNumber', 'number'
-        attribute 'regionActivity', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region1', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region2', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region3', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region4', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region5', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region6', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region7', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region8', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region9', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region10', 'enum', REGION_ACTIONS.values() as List<String>
 
         fingerprint model: 'lumi.motion.ac01', manufacturer: 'aqara', profileId: '0104', endpointId: '01', inClusters: '0000,0003,FCC0', outClusters: '0003,0019', application: '36'
     }
@@ -66,10 +74,35 @@ metadata {
         input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description:\
             '<i>Enables direction detection capabilities.</i>'
 
-        (1..10).each { int id ->
-            input name: "detectionRegion${id}", type: 'text', title: "<b>Detection Region #${id}</b>", description: \
-                "<i>Set grid value for <b>region ${id}</b> by using the ${getPopupLink('region calculator')}.</i>"
-        }
+        input name: "detectionRegion1", type: 'text', title: '<b>Detection Region #1</b>', description: \
+            "<i>Set grid value for <b>region 1</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion2", type: 'text', title: '<b>Detection Region #2</b>', description: \
+            "<i>Set grid value for <b>region 2</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion3", type: 'text', title: '<b>Detection Region #3</b>', description: \
+            "<i>Set grid value for <b>region 3</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion4", type: 'text', title: '<b>Detection Region #4</b>', description: \
+            "<i>Set grid value for <b>region 4</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion5", type: 'text', title: '<b>Detection Region #5</b>', description: \
+            "<i>Set grid value for <b>region 5</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion6", type: 'text', title: '<b>Detection Region #6</b>', description: \
+            "<i>Set grid value for <b>region 6</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion7", type: 'text', title: '<b>Detection Region #7</b>', description: \
+            "<i>Set grid value for <b>region 7</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion8", type: 'text', title: '<b>Detection Region #8</b>', description: \
+            "<i>Set grid value for <b>region 8</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion9", type: 'text', title: '<b>Detection Region #9</b>', description: \
+            "<i>Set grid value for <b>region 9</b> by using the ${getPopupLink('region calculator')}.</i>"
+
+        input name: "detectionRegion10", type: 'text', title: '<b>Detection Region #10</b>', description: \
+            "<i>Set grid value for <b>region 10</b> by using the ${getPopupLink('region calculator')}.</i>"
 
         input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: \
                 "<i>Optional region masking value from the ${getPopupLink('region calculator')}.</i>"
@@ -301,8 +334,7 @@ void parseXiaomiCluster(Map descMap) {
             Integer value = HexUtils.hexStringToInt(descMap.value[2..3])
             String regionActivity = REGION_ACTIONS.get(value)
             if (settings.logEnable) { log.debug "xiaomi: region ${regionId} action is ${value}" }
-            updateAttribute('regionNumber', regionId)
-            updateAttribute('regionActivity', regionActivity)
+            updateAttribute("region${regionId}", regionActivity)
             break
         case SENSITIVITY_LEVEL_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
@@ -349,8 +381,6 @@ List<String> resetPresence() {
     updateAttribute('motion', 'inactive')
     updateAttribute('presence', 'not present')
     updateAttribute('activity', 'leave')
-    device.deleteCurrentState('regionNumber')
-    device.deleteCurrentState('regionActivity')
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, RESET_PRESENCE_ATTR_ID, DataType.UINT8, 0x01, MFG_CODE, 0)
 }
 
@@ -469,6 +499,7 @@ private List<String> setDetectionRegionAttribute(int regionId, int... grid) {
             .append(HEX_CHARS[grid[6]])
             .append('FF')
     }
+    if (settings.logEnable) { log.debug "set region ${regionId} to ${octetStr}" }
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, DataType.STRING_OCTET, octetStr, MFG_CODE, DELAY_MS)
 }
 
