@@ -1,91 +1,100 @@
-<style>
-  .box {
-    width: 30px;
-    height: 30px;
-    border: 1px dotted black;
-  }
-  th {
-    width: 30px;
-    height: 30px;
-    border: none; /* remove outline */
-    text-align: center;
-    vertical-align: middle;
-    font-weight: bold; /* bold font */
-    color: blue; /* blue color */
-  }
-  .selected {
-    background-color: blue;
-  }
-  #grid {
-    margin-left: 25px;
-  }
-  .result {
-    margin-left: 10px;
-    font-weight: bold;
-    color: green;
-  }
-</style>
-<table id="grid">
-</table>
-<br>
-<div class="result">
-    <label for="sums">Value:&nbsp;</label>
-    <input type="text" id="sums" readonly>
-</div>
-<script>
-  const numRows = 7;
-  const numCols = 4;
-  const grid = document.getElementById('grid');
-  const sumsTextbox = document.getElementById('sums');
-  
-  // Create the header row
-  let headerRow = document.createElement('tr');
-  let headerCell = document.createElement('th');
-  headerRow.appendChild(headerCell);
-  for (let j = 1; j <= numCols; j++) {
-    headerCell = document.createElement('th');
-    headerCell.textContent = j;
-    headerRow.appendChild(headerCell);
-  }
-  grid.appendChild(headerRow);
-  
-  // Create the rest of the rows
-  for (let i = 1; i <= numRows; i++) {
-    let row = document.createElement('tr');
-    let headerCell = document.createElement('th');
-    headerCell.textContent = i;
-    row.appendChild(headerCell);
-    for (let j = 1; j <= numCols; j++) {
-      let cell = document.createElement('td');
-      cell.classList.add('box');
-      cell.addEventListener('click', () => {
-        if (cell.classList.contains('selected')) {
-          cell.classList.remove('selected');
-        } else {
-          cell.classList.add('selected');
-        }
-        updateRowSums();
-      });
-      row.appendChild(cell);
-    }
-    grid.appendChild(row);
-  }
-  
-  const cells = grid.querySelectorAll('.box');
-
-  // Update the row sums whenever a cell is selected or unselected
-  function updateRowSums() {
-    const sums = Array(numRows).fill(0);
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i].classList.contains('selected')) {
-        let row = cells[i].parentNode.rowIndex - 1;
-        let col = cells[i].cellIndex - 1;
-        sums[row] += Math.pow(2, col);
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Detection Grid Calculator</title>
+    <style>
+      .box {
+        width: 30px;
+        height: 30px;
+        border: 1px dotted black;
       }
-    }
-    console.log(sums);
-    sumsTextbox.value = sums.join(', ');
-  }
+      th {
+        width: 30px;
+        height: 30px;
+        border: none; /* remove outline */
+        text-align: center;
+        vertical-align: middle;
+        font-weight: bold; /* bold font */
+        color: blue; /* blue color */
+      }
+      .selected {
+        background-color: blue;
+      }
+      #grid {
+        margin-left: 25px;
+      }
+      .result {
+        margin-left: 10px;
+        font-weight: bold;
+        color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Detection Grid Calculator</h2>
+    <table id="grid">
+    </table>
+    <br>
+    <div class="result">
+        <label for="sums">Value:&nbsp;</label>
+        <input type="text" id="sums" readonly>
+    </div>
+    <script>
+      const numRows = 7;
+      const numCols = 4;
+      const grid = document.getElementById('grid');
+      const sumsTextbox = document.getElementById('sums');
+      
+      // Create the header row
+      let headerRow = document.createElement('tr');
+      let headerCell = document.createElement('th');
+      headerRow.appendChild(headerCell);
+      for (let j = 1; j <= numCols; j++) {
+        headerCell = document.createElement('th');
+        headerCell.textContent = j;
+        headerRow.appendChild(headerCell);
+      }
+      grid.appendChild(headerRow);
+      
+      // Create the rest of the rows
+      for (let i = 1; i <= numRows; i++) {
+        let row = document.createElement('tr');
+        let headerCell = document.createElement('th');
+        headerCell.textContent = i;
+        row.appendChild(headerCell);
+        for (let j = 1; j <= numCols; j++) {
+          let cell = document.createElement('td');
+          cell.classList.add('box');
+          cell.addEventListener('click', () => {
+            if (cell.classList.contains('selected')) {
+              cell.classList.remove('selected');
+            } else {
+              cell.classList.add('selected');
+            }
+            updateRowSums();
+          });
+          row.appendChild(cell);
+        }
+        grid.appendChild(row);
+      }
+      
+      const cells = grid.querySelectorAll('.box');
 
-  updateRowSums()
-</script>
+      // Update the row sums whenever a cell is selected or unselected
+      function updateRowSums() {
+        const sums = Array(numRows).fill(0);
+        for (let i = 0; i < cells.length; i++) {
+          if (cells[i].classList.contains('selected')) {
+            let row = cells[i].parentNode.rowIndex - 1;
+            let col = cells[i].cellIndex - 1;
+            sums[row] += Math.pow(2, col);
+          }
+        }
+        console.log(sums);
+        sumsTextbox.value = sums.join(', ');
+      }
+
+      updateRowSums()
+    </script>
+  </body>
+</html>
