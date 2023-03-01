@@ -35,6 +35,7 @@
 import groovy.transform.Field
 import hubitat.helper.HexUtils
 import hubitat.zigbee.zcl.DataType
+import java.util.concurrent.ConcurrentHashMap
 
 metadata {
     definition(name: 'Aqara Presence Sensor FP1',
@@ -66,42 +67,42 @@ metadata {
 
     preferences {
         input name: 'approachDistance', type: 'enum', title: '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description:\
-            '<i>Maximum distance for detecting approach vs away.</i>'
+            '<i>Maximum distance for detecting approach/away activity.</i>'
 
         input name: 'sensitivityLevel', type: 'enum', title: '<b>Motion Sensitivity</b>', options: SensitivityLevelOpts.options, defaultValue: SensitivityLevelOpts.defaultValue, description:\
-            '<i>Sensitivity of movement detection.</i>'
+            '<i>Sensitivity of movement detection for determining presence.</i>'
 
         input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description:\
-            '<i>Enables direction detection capabilities.</i>'
+            '<i>Select capability mode for direction detection (left and right).</i>'
 
-        input name: "detectionRegion1", type: 'text', title: '<b>Detection Region #1</b>', description: \
+        input name: 'detectionRegion1', type: 'text', title: '<b>Detection Region #1</b>', description: \
             "<i>Set grid value for <b>region 1</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion2", type: 'text', title: '<b>Detection Region #2</b>', description: \
+        input name: 'detectionRegion2', type: 'text', title: '<b>Detection Region #2</b>', description: \
             "<i>Set grid value for <b>region 2</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion3", type: 'text', title: '<b>Detection Region #3</b>', description: \
+        input name: 'detectionRegion3', type: 'text', title: '<b>Detection Region #3</b>', description: \
             "<i>Set grid value for <b>region 3</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion4", type: 'text', title: '<b>Detection Region #4</b>', description: \
+        input name: 'detectionRegion4', type: 'text', title: '<b>Detection Region #4</b>', description: \
             "<i>Set grid value for <b>region 4</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion5", type: 'text', title: '<b>Detection Region #5</b>', description: \
+        input name: 'detectionRegion5', type: 'text', title: '<b>Detection Region #5</b>', description: \
             "<i>Set grid value for <b>region 5</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion6", type: 'text', title: '<b>Detection Region #6</b>', description: \
+        input name: 'detectionRegion6', type: 'text', title: '<b>Detection Region #6</b>', description: \
             "<i>Set grid value for <b>region 6</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion7", type: 'text', title: '<b>Detection Region #7</b>', description: \
+        input name: 'detectionRegion7', type: 'text', title: '<b>Detection Region #7</b>', description: \
             "<i>Set grid value for <b>region 7</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion8", type: 'text', title: '<b>Detection Region #8</b>', description: \
+        input name: 'detectionRegion8', type: 'text', title: '<b>Detection Region #8</b>', description: \
             "<i>Set grid value for <b>region 8</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion9", type: 'text', title: '<b>Detection Region #9</b>', description: \
+        input name: 'detectionRegion9', type: 'text', title: '<b>Detection Region #9</b>', description: \
             "<i>Set grid value for <b>region 9</b> by using the ${getPopupLink('region calculator')}.</i>"
 
-        input name: "detectionRegion10", type: 'text', title: '<b>Detection Region #10</b>', description: \
+        input name: 'detectionRegion10', type: 'text', title: '<b>Detection Region #10</b>', description: \
             "<i>Set grid value for <b>region 10</b> by using the ${getPopupLink('region calculator')}.</i>"
 
         input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: \
@@ -159,6 +160,7 @@ List<String> configure() {
         } else {
             log.info "removing detection region ${id}"
             cmds += setDetectionRegionAttribute(id, 0, 0, 0, 0, 0, 0, 0)
+            device.deleteCurrentState("region${id}")
         }
     }
 
@@ -330,11 +332,12 @@ void parseXiaomiCluster(Map descMap) {
             }
             break
         case REGION_EVENT_ATTR_ID:
+            // Region events are sent fast and furious so we need to buffer them
             Integer regionId = HexUtils.hexStringToInt(descMap.value[0..1])
             Integer value = HexUtils.hexStringToInt(descMap.value[2..3])
-            String regionActivity = REGION_ACTIONS.get(value)
+            RegionCache.get(device.id).put(regionId, value)
+            runInMillis(REGION_UPDATE_DELAY_MS, 'updateRegions')
             if (settings.logEnable) { log.debug "xiaomi: region ${regionId} action is ${value}" }
-            updateAttribute("region${regionId}", regionActivity)
             break
         case SENSITIVITY_LEVEL_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
@@ -366,6 +369,16 @@ void parseXiaomiCluster(Map descMap) {
         default:
             log.warn "zigbee received unknown Xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
             break
+    }
+}
+
+void updateRegions() {
+    if (settings.logEnable) { log.debug 'processing region cache' }
+    Map regions = RegionCache.get(device.id)
+    for (iter = regions.entrySet().iterator(); iter.hasNext();) {
+        Map.Entry<Integer, Integer> entry = iter.next()
+        iter.remove()
+        updateAttribute("region${entry.key}", REGION_ACTIONS.get(entry.value))
     }
 }
 
@@ -523,6 +536,10 @@ private void updateAttribute(String attribute, Object value, String unit = null,
     sendEvent(name: attribute, value: value, unit: unit, type: type, descriptionText: descriptionText)
 }
 
+@Field static final Map<String, Map> RegionCache = new ConcurrentHashMap<>().withDefault {
+    new ConcurrentHashMap<Integer, Integer>()
+}
+
 // Hex characters used for conversion
 @Field static final char[] HEX_CHARS = '0123456789ABCDEF'.toCharArray()
 
@@ -596,6 +613,9 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 
 // Delay inbetween zigbee commands
 @Field static final int DELAY_MS = 200
+
+// Delay inbetween region updates to avoid bounces
+@Field static final int REGION_UPDATE_DELAY_MS = 500
 
 private String getPopupLink(String title) {
     String url = 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Aqara/AqaraFP1DetectionGrid.html'
