@@ -74,6 +74,9 @@ metadata {
         input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid Region</b>', defaultValue: '1,7,0,0', description: \
             "<i>Optional interference <a href=\'${GRID_IMG_HREF}\' target='_blank'>region</a> (top, bottom, left, right)</i>"
 
+        input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description:\
+            '<i>Reset presence if stuck for extended period of time.</i>'
+
         input name: 'healthCheckInterval', type: 'enum', title: '<b>Healthcheck Interval</b>', options: HealthcheckIntervalOpts.options, defaultValue: HealthcheckIntervalOpts.defaultValue, description:\
             '<i>Changes how often the hub pings sensor to check health.</i>'
 
@@ -130,6 +133,9 @@ List<String> configure() {
         TRIGGER_DISTANCE_ATTR_ID,
         DIRECTION_MODE_ATTR_ID,
     ], MFG_CODE, DELAY_MS)
+
+    // Enable raw sensor data
+    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, 0x0155, DataType.UINT8, 0x01, MFG_CODE, DELAY_MS)
 
     if (settings.logEnable) { log.debug "zigbee configure cmds: ${cmds}" }
 
@@ -244,6 +250,11 @@ void parseXiaomiCluster(Map descMap) {
             Integer value = hexStrToUnsignedInt(descMap.value)
             if (settings.logEnable) { log.debug "xiaomi: presence attribute is ${value}" }
             updateAttribute('presence', value == 0 ? 'not present' : 'present')
+            if (settings.presenceResetInterval && value) {
+                runIn((settings.presenceResetInterval as int) * 3600, 'resetPresence')
+            } else if (settings.presenceResetInterval) {
+                unschedule('resetPresence')
+            }
             break
         case PRESENCE_ACTIONS_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
@@ -286,6 +297,11 @@ void parseXiaomiCluster(Map descMap) {
                 device.updateDataValue('softwareBuild', swBuild)
             }
             break
+        // case XIAOMI_RAW_ATTR_ID:
+        //     byte[] rawData = HexUtils.hexStringToByteArray(descMap.value)
+        //     int distanceCm = new BigInteger((byte[])[rawData[17], rawData[18]]).toInteger()
+        //     log.debug "distance ${distanceCm}cm"
+        //     break
         default:
             log.warn "zigbee received unknown Xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
             break
@@ -498,10 +514,24 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final char[] HEX_CHARS = '0123456789ABCDEF'.toCharArray()
 
 // Set of Presence Actions
-@Field static final Map<Integer, String> PRESENCE_ACTIONS = [ 0: 'enter', 1: 'leave', 2: 'enter (left)', 3: 'leave (right)', 4: 'enter (right)', 5: 'leave (left)', 6: 'closer', 7: 'away' ]
+@Field static final Map<Integer, String> PRESENCE_ACTIONS = [
+    0: 'enter',
+    1: 'leave',
+    2: 'enter (left)',
+    3: 'leave (right)',
+    4: 'enter (right)',
+    5: 'leave (left)',
+    6: 'towards',
+    7: 'away'
+]
 
 // Set of Region Actions
-@Field static final Map<Integer, String> REGION_ACTIONS = [ 1: 'enter', 2: 'leave', 4: 'occupied', 8: 'unoccupied' ]
+@Field static final Map<Integer, String> REGION_ACTIONS = [
+    1: 'enter',
+    2: 'leave',
+    4: 'occupied',
+    8: 'unoccupied'
+]
 
 // Zigbee Cluster, Attribute and Xiaomi Tag IDs
 @Field static final int DIRECTION_MODE_ATTR_ID = 0x0144
@@ -519,6 +549,7 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final int TRIGGER_DISTANCE_ATTR_ID = 0x0146
 @Field static final int XIAOMI_TAGS_ATTR_ID = 0x00F7
 @Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
+@Field static final int XIAOMI_RAW_ATTR_ID = 0xFFF2
 @Field static final Map MFG_CODE = [ mfgCode: 0x115F ]
 
 // Configuration options
@@ -540,6 +571,11 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final Map HealthcheckIntervalOpts = [
     defaultValue: 10,
     options: [ 10: 'Every 10 Mins', 15: 'Every 15 Mins', 30: 'Every 30 Mins', 45: 'Every 45 Mins', 59: 'Every Hour', 00: 'Disabled' ]
+]
+
+@Field static final Map PresenceResetOpts = [
+    defaultValue: 0,
+    options: [ 0: 'Disabled', 60: 'After 1 Hour', 2: 'After 2 Hours', 4: 'After 4 Hours', 8: 'After 8 Hours', 12: 'After 12 Hours' ]
 ]
 
 // Command timeout before setting healthState to offline
