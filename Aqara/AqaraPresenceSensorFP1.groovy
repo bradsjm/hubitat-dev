@@ -51,7 +51,7 @@ metadata {
         attribute 'healthStatus', 'enum', [ 'unknown', 'offline', 'online' ]
         attribute 'activity', 'enum', PRESENCE_ACTIONS.values() as List<String>
         attribute 'regionNumber', 'number'
-        attribute 'regionAction', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'regionActivity', 'enum', REGION_ACTIONS.values() as List<String>
 
         fingerprint model: 'lumi.motion.ac01', manufacturer: 'aqara', profileId: '0104', endpointId: '01', inClusters: '0000,0003,FCC0', outClusters: '0003,0019', application: '36'
     }
@@ -299,10 +299,10 @@ void parseXiaomiCluster(Map descMap) {
         case REGION_EVENT_ATTR_ID:
             Integer regionId = HexUtils.hexStringToInt(descMap.value[0..1])
             Integer value = HexUtils.hexStringToInt(descMap.value[2..3])
-            String regionAction = REGION_ACTIONS.get(value)
+            String regionActivity = REGION_ACTIONS.get(value)
             if (settings.logEnable) { log.debug "xiaomi: region ${regionId} action is ${value}" }
             updateAttribute('regionNumber', regionId)
-            updateAttribute('regionAction', regionAction)
+            updateAttribute('regionActivity', regionActivity)
             break
         case SENSITIVITY_LEVEL_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
@@ -311,7 +311,7 @@ void parseXiaomiCluster(Map descMap) {
             break
         case TRIGGER_DISTANCE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
-            log.info "trigger distance is '${ApproachDistanceOpts.options[value]}' (0x${descMap.value})"
+            log.info "approach distance is '${ApproachDistanceOpts.options[value]}' (0x${descMap.value})"
             device.updateSetting('approachDistance', [value: value.toString(), type: 'enum' ])
             break
         case DIRECTION_MODE_ATTR_ID:
@@ -350,7 +350,7 @@ List<String> resetPresence() {
     updateAttribute('presence', 'not present')
     updateAttribute('activity', 'leave')
     device.deleteCurrentState('regionNumber')
-    device.deleteCurrentState('regionAction')
+    device.deleteCurrentState('regionActivity')
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, RESET_PRESENCE_ATTR_ID, DataType.UINT8, 0x01, MFG_CODE, 0)
 }
 
