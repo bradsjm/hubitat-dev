@@ -38,7 +38,7 @@ import hubitat.zigbee.zcl.DataType
 
 metadata {
     definition(name: 'Aqara Presence Sensor FP1',
-            importUrl: 'https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Zigbee/AqaraPresenceSensorFP1.groovy',
+            importUrl: 'https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Aqara/AqaraPresenceSensorFP1.groovy',
             namespace: 'aqara', author: 'Jonathan Bradshaw') {
         capability 'Configuration'
         capability 'Health Check'
@@ -68,11 +68,17 @@ metadata {
 
         (1..10).each { int id ->
             input name: "detectionRegion${id}", type: 'text', title: "<b>Detection Region #${id}</b>", description: \
-                "<i>Set detection grid for <a href=\'${GRID_IMG_HREF}\' target='_blank'>region ${id}</a> (top, bottom, left, right)</i>"
+                "<i>Set grid value for <b>region ${id}</b> by using the ${getPopupLink('region calculator')}.</i>"
         }
 
-        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid Region</b>', defaultValue: '1,7,0,0', description: \
-            "<i>Optional interference <a href=\'${GRID_IMG_HREF}\' target='_blank'>region</a> (top, bottom, left, right)</i>"
+        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: \
+                "<i>Optional region masking value from the ${getPopupLink('region calculator')}.</i>"
+
+        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: \
+                "<i>Optional exit/entrances value from the ${getPopupLink('region calculator')}.</i>"
+
+        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: \
+                "<i>Optional edges grid value from the ${getPopupLink('region calculator')}.</i>"
 
         input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description:\
             '<i>Reset presence if stuck for extended period of time.</i>'
@@ -88,9 +94,7 @@ metadata {
     }
 }
 
-@Field static final String GRID_IMG_HREF = 'https://smarthomescene.com/wp-content/uploads/2023/02/aqara-fp1-regions-zigbee2mqtt-zone-grid.jpg'
-
-@Field static final String VERSION = '0.1'
+@Field static final String VERSION = '0.2'
 
 List<String> configure() {
     List<String> cmds = []
@@ -98,33 +102,58 @@ List<String> configure() {
 
     // Set motion sensitivity
     if (settings.sensitivityLevel) {
+        log.info "setting sensitivity level to ${SensitivityLevelOpts.options[settings.sensitivityLevel as Integer]}"
         cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, settings.sensitivityLevel as Integer, MFG_CODE, DELAY_MS)
     }
 
     // Set trigger distance
     if (settings.approachDistance) {
+        log.info "setting approach distance to ${ApproachDistanceOpts.options[settings.approachDistance as Integer]}"
         cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, settings.approachDistance as Integer, MFG_CODE, DELAY_MS)
     }
 
     // Enable left right detection
     if (settings.directionMode) {
+        log.info "setting direction mode to ${DirectionModeOpts.options[settings.directionMode as Integer]}"
         cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, settings.directionMode as Integer, MFG_CODE, DELAY_MS)
     }
 
     // Set detection regions
     (1..10).each { int id ->
         if (settings["detectionRegion${id}"]) {
-            cmds += setDetectionRegion(id, settings["detectionRegion${id}"].tokenize(',') as int[])
+            log.info "setting detection region ${id} value to " + settings["detectionRegion${id}"]
+            cmds += setDetectionRegionAttribute(id, settings["detectionRegion${id}"].tokenize(',') as int[])
         } else {
-            cmds += setDetectionRegion(id, 1, 7, 0, 0)
+            log.info "removing detection region ${id}"
+            cmds += setDetectionRegionAttribute(id, 0, 0, 0, 0, 0, 0, 0)
         }
     }
 
     // Set interference region
     if (settings.interferenceRegion) {
-        cmds += setInterferenceRegion(settings.interferenceRegion.tokenize(',') as int[])
+        log.info 'setting detection interference region value to ' + settings.interferenceRegion
+        cmds += setRegionAttribute(SET_INTERFERENCE_ATTR_ID, settings.interferenceRegion.tokenize(',') as int[])
     } else {
-        cmds += setInterferenceRegion(1, 7, 0, 0)
+        log.info 'removing detection interference region'
+        cmds += setRegionAttribute(SET_INTERFERENCE_ATTR_ID, 0, 0, 0, 0, 0, 0, 0)
+    }
+
+    // Set exits/entrances region
+    if (settings.exitEntrancesRegion) {
+        log.info 'setting exits/entrances region value to ' + settings.exitEntrancesRegion
+        cmds += setRegionAttribute(SET_EXIT_REGION_ATTR_ID, settings.exitEntrancesRegion.tokenize(',') as int[])
+    } else {
+        log.info 'removing exits/entrances region'
+        cmds += setRegionAttribute(SET_EXIT_REGION_ATTR_ID, 0, 0, 0, 0, 0, 0, 0)
+    }
+
+    // Set edges region
+    if (settings.edgesRegion) {
+        log.info 'setting edges region value to ' + settings.edgesRegion
+        cmds += setRegionAttribute(SET_EDGE_REGION_ATTR_ID, settings.edgesRegion.tokenize(',') as int[])
+    } else {
+        log.info 'removing edges region'
+        cmds += setRegionAttribute(SET_EDGE_REGION_ATTR_ID, 0, 0, 0, 0, 0, 0, 0)
     }
 
     // Get configuration
@@ -345,48 +374,6 @@ void updated() {
 }
 
 /**
- *  Calculates the set of values that make up a boxed region specified by
- *  the top, bottom, left and right parameters and returns an array of 7 rows
- *  used by the Aqara FP1 region operations. If left and right are passed in
- *  as zero then it is assumed the matrix should be blank.
- *
- *      X1 X2 X3 X4
- *  Y1 | 1| 2| 4| 8|
- *  Y2 | 1| 2| 4| 8|
- *  Y3 | 1| 2| 4| 8|
- *  Y4 | 1| 2| 4| 8|
- *  Y5 | 1| 2| 4| 8|
- *  Y6 | 1| 2| 4| 8|
- *  Y7 | 1| 2| 4| 8|
- */
-private static char[] calculateBoxedRegionArray(int top, int bottom, int left, int right) {
-    int total = left + right > 0 ? (1 << right) - (1 << (left - 1)) : 0
-    char[] results = new char[7]
-    for (int i = top - 1; i < bottom; i++) { results[i] = HEX_CHARS[total] }
-    return results
-}
-
-/**
- *  Calculates the region value for a boxed region specified by
- *  the given horizontal (X) and vertical (Y) parameters that is
- *  used by the Aqara FP1 region operations.
- */
-private static String calculateBoxedRegionHex(int[] x, int[] y) {
-    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < x[0] || x[1] > 4) {
-        return ''
-    }
-    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < y[0] || y[1] > 7) {
-        return ''
-    }
-    char[] matrix = calculateBoxedRegionArray(y[0], y[1], x[0], x[1]) // top, bottom, left, right
-    StringBuilder hexString = new StringBuilder('0')
-    for (int i = matrix.length - 1; i >= 0; i--) {
-        hexString.append(matrix[i])
-    }
-    return hexString.toString()
-}
-
-/**
  *  Reads a specified number of little-endian bytes from a given
  *  ByteArrayInputStream and returns a BigInteger.
  */
@@ -413,7 +400,7 @@ private String clusterLookup(Object cluster) {
 /**
  *  Decodes a Xiaomi Zigbee cluster attribute payload in hexadecimal format and
  *  returns a map of decoded tag number and value pairs where the value is either a
- *  BigInteger for discreet values or a String for variable length.
+ *  BigInteger for fixed values or a String for variable length.
  */
 private Map<Integer, Object> decodeXiaomiTags(String hexString) {
     Map<Integer, Object> results = [:]
@@ -450,56 +437,51 @@ private void scheduleDeviceHealthCheck(int intervalMins) {
     schedule("${rnd.nextInt(59)} ${rnd.nextInt(9)}/${intervalMins} * ? * * *", 'ping')
 }
 
-private List<String> setDetectionRegion(int regionId, int... box) {
-    int[] y = box[0..1] as int[]
-    int[] x = box[2..3] as int[]
+/**
+ *  Set a detection region on an Aqara FP1 device based on the provided grid coordinates.
+ *
+ *  This function takes in a region ID and a grid array containing seven values representing the
+ *  rows of the grid. It checks if the region ID and grid values are valid, and returns an
+ *  empty list if they are not.
+ */
+private List<String> setDetectionRegionAttribute(int regionId, int... grid) {
     if (regionId < 1 || regionId > 10) {
         log.error 'region must be between 1 and 10'
         return []
     }
-    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < x[0] || x[1] > 4) {
-        log.error("Invalid horizontal value: ${x}")
-        return []
-    }
-    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < y[0] || y[1] > 7) {
-        log.error("Invalid vertical value: ${y}")
+    if (grid.size() != 7) {
+        log.error 'grid must contain 7 row values'
         return []
     }
 
-    String octetStr
-    if (x[0] == 0 && x[1] == 0) { // remove region
-        octetStr = '07020' + HEX_CHARS[(int)regionId] + '0000000000'
-    } else {
-        char[] matrix = calculateBoxedRegionArray(y[0], y[1], x[0], x[1])
+    String octetStr = '07020' + HEX_CHARS[(int)regionId] + '0000000000'
+    if (grid.sum() > 0) {
         octetStr = new StringBuilder()
             .append('07010')
             .append(HEX_CHARS[(int)regionId])
-            .append(matrix[1])
-            .append(matrix[0])
-            .append(matrix[3])
-            .append(matrix[2])
-            .append(matrix[5])
-            .append(matrix[4])
+            .append(HEX_CHARS[grid[1]])
+            .append(HEX_CHARS[grid[0]])
+            .append(HEX_CHARS[grid[3]])
+            .append(HEX_CHARS[grid[2]])
+            .append(HEX_CHARS[grid[5]])
+            .append(HEX_CHARS[grid[4]])
             .append('0')
-            .append(matrix[6])
+            .append(HEX_CHARS[grid[6]])
             .append('FF')
     }
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, DataType.STRING_OCTET, octetStr, MFG_CODE, DELAY_MS)
 }
 
-private List<String> setInterferenceRegion(int... box) {
-    int[] y = box[0..1] as int[]
-    int[] x = box[2..3] as int[]
-    if (x.length != 2 || x[0] < 0 || x[0] > 4 || x[1] < x[0] || x[1] > 4) {
-        log.error("Invalid horizontal value: ${x}")
+private List<String> setRegionAttribute(int attribute, int... grid) {
+    if (grid.size() != 7) {
+        log.error 'grid must contain exactly 7 row values'
         return []
     }
-    if (y.length != 2 || y[0] < 1 || y[0] > 7 || y[1] < y[0] || y[1] > 7) {
-        log.error("Invalid vertical value: ${y}")
-        return []
+    StringBuilder hexString = new StringBuilder('0')
+    for (int i = 6; i >= 0; i--) {
+        hexString.append(HEX_CHARS[grid[i]])
     }
-    String value = calculateBoxedRegionHex(x, y)
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_INTERFERENCE_ATTR_ID, DataType.UINT32, value, MFG_CODE, DELAY_MS)
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, attribute, DataType.UINT32, hexString.toString(), MFG_CODE, DELAY_MS)
 }
 
 private void updateAttribute(String attribute, Object value, String unit = null, String type = 'digital') {
@@ -583,3 +565,8 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 
 // Delay inbetween zigbee commands
 @Field static final int DELAY_MS = 200
+
+private String getPopupLink(String title) {
+    String url = 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Aqara/AqaraFP1DetectionGrid.html'
+    return """<a href='#' onClick="window.open('${url}','popUpGrid','height=450,width=300,left=100,top=200,resizable=no,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');">${title}</a>"""
+}
