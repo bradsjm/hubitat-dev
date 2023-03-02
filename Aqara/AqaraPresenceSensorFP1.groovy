@@ -141,7 +141,8 @@ List<String> configure() {
 
     // Set detection regions
     (1..10).each { int id ->
-        if (settings["detectionRegion${id}"]) {
+        String grid = settings["detectionRegion${id}"]
+        if (grid && grid != '0, 0, 0, 0, 0, 0, 0') {
             log.info "setting detection region ${id} value to " + settings["detectionRegion${id}"]
             cmds += setDetectionRegionAttribute(id, settings["detectionRegion${id}"].tokenize(',') as int[])
         } else {
@@ -152,7 +153,7 @@ List<String> configure() {
     }
 
     // Set interference region
-    if (settings.interferenceRegion) {
+    if (settings.interferenceRegion && settings.interferenceRegion != '0, 0, 0, 0, 0, 0, 0') {
         log.info 'setting detection interference region value to ' + settings.interferenceRegion
         cmds += setRegionAttribute(SET_INTERFERENCE_ATTR_ID, settings.interferenceRegion.tokenize(',') as int[])
     } else {
@@ -161,7 +162,7 @@ List<String> configure() {
     }
 
     // Set exits/entrances region
-    if (settings.exitEntrancesRegion) {
+    if (settings.exitEntrancesRegion && settings.exitEntrancesRegion != '0, 0, 0, 0, 0, 0, 0') {
         log.info 'setting exits/entrances region value to ' + settings.exitEntrancesRegion
         cmds += setRegionAttribute(SET_EXIT_REGION_ATTR_ID, settings.exitEntrancesRegion.tokenize(',') as int[])
     } else {
@@ -170,7 +171,7 @@ List<String> configure() {
     }
 
     // Set edges region
-    if (settings.edgesRegion) {
+    if (settings.edgesRegion && settings.edgesRegion != '0, 0, 0, 0, 0, 0, 0') {
         log.info 'setting edges region value to ' + settings.edgesRegion
         cmds += setRegionAttribute(SET_EDGE_REGION_ATTR_ID, settings.edgesRegion.tokenize(',') as int[])
     } else {
