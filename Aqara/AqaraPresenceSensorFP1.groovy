@@ -66,7 +66,7 @@ metadata {
     }
 
     preferences {
-        input name: 'approachDistance', type: 'enum', title: '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description:\
+        input name: 'approachDistance', type: 'enum', title: getCalculatorStyle() + '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description:\
             '<i>Maximum distance for detecting approach/away activity.</i>'
 
         input name: 'sensitivityLevel', type: 'enum', title: '<b>Motion Sensitivity</b>', options: SensitivityLevelOpts.options, defaultValue: SensitivityLevelOpts.defaultValue, description:\
@@ -75,44 +75,31 @@ metadata {
         input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description:\
             '<i>Select capability mode for direction detection (left and right).</i>'
 
-        input name: 'detectionRegion1', type: 'text', title: '<b>Detection Region #1</b>', description: \
-            "<i>Set grid value for <b>region 1</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion1', type: 'text', title: '<b>Detection Region #1</b>', description: getCalculatorTable('region1')
 
-        input name: 'detectionRegion2', type: 'text', title: '<b>Detection Region #2</b>', description: \
-            "<i>Set grid value for <b>region 2</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion2', type: 'text', title: '<b>Detection Region #2</b>', description: getCalculatorTable('region2')
 
-        input name: 'detectionRegion3', type: 'text', title: '<b>Detection Region #3</b>', description: \
-            "<i>Set grid value for <b>region 3</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion3', type: 'text', title: '<b>Detection Region #3</b>', description: getCalculatorTable('region3')
 
-        input name: 'detectionRegion4', type: 'text', title: '<b>Detection Region #4</b>', description: \
-            "<i>Set grid value for <b>region 4</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion4', type: 'text', title: '<b>Detection Region #4</b>', description: getCalculatorTable('region4')
 
-        input name: 'detectionRegion5', type: 'text', title: '<b>Detection Region #5</b>', description: \
-            "<i>Set grid value for <b>region 5</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion5', type: 'text', title: '<b>Detection Region #5</b>', description: getCalculatorTable('region5')
 
-        input name: 'detectionRegion6', type: 'text', title: '<b>Detection Region #6</b>', description: \
-            "<i>Set grid value for <b>region 6</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion6', type: 'text', title: '<b>Detection Region #6</b>', description: getCalculatorTable('region6')
 
-        input name: 'detectionRegion7', type: 'text', title: '<b>Detection Region #7</b>', description: \
-            "<i>Set grid value for <b>region 7</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion7', type: 'text', title: '<b>Detection Region #7</b>', description: getCalculatorTable('region7')
 
-        input name: 'detectionRegion8', type: 'text', title: '<b>Detection Region #8</b>', description: \
-            "<i>Set grid value for <b>region 8</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion8', type: 'text', title: '<b>Detection Region #8</b>', description: getCalculatorTable('region8')
 
-        input name: 'detectionRegion9', type: 'text', title: '<b>Detection Region #9</b>', description: \
-            "<i>Set grid value for <b>region 9</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion9', type: 'text', title: '<b>Detection Region #9</b>', description: getCalculatorTable('region9')
 
-        input name: 'detectionRegion10', type: 'text', title: '<b>Detection Region #10</b>', description: \
-            "<i>Set grid value for <b>region 10</b> by using the ${getPopupLink('region calculator')}.</i>"
+        input name: 'detectionRegion10', type: 'text', title: '<b>Detection Region #10</b>', description: getCalculatorTable('region10')
 
-        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: \
-                "<i>Optional region masking value from the ${getPopupLink('region calculator')}.</i>"
+        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorTable('interference')
 
-        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: \
-                "<i>Optional exit/entrances value from the ${getPopupLink('region calculator')}.</i>"
+        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorTable('exitentrances')
 
-        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: \
-                "<i>Optional edges grid value from the ${getPopupLink('region calculator')}.</i>"
+        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorTable('edges')
 
         input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description:\
             '<i>Reset presence if stuck for extended period of time.</i>'
@@ -128,7 +115,7 @@ metadata {
     }
 }
 
-@Field static final String VERSION = '0.2'
+@Field static final String VERSION = '0.3'
 
 List<String> configure() {
     List<String> cmds = []
@@ -335,7 +322,7 @@ void parseXiaomiCluster(Map descMap) {
             // Region events are sent fast and furious so we need to buffer them
             Integer regionId = HexUtils.hexStringToInt(descMap.value[0..1])
             Integer value = HexUtils.hexStringToInt(descMap.value[2..3])
-            RegionCache.get(device.id).put(regionId, value)
+            RegionUpdateBuffer.get(device.id).put(regionId, value)
             runInMillis(REGION_UPDATE_DELAY_MS, 'updateRegions')
             if (settings.logEnable) { log.debug "xiaomi: region ${regionId} action is ${value}" }
             break
@@ -374,7 +361,7 @@ void parseXiaomiCluster(Map descMap) {
 
 void updateRegions() {
     if (settings.logEnable) { log.debug 'processing region cache' }
-    Map regions = RegionCache.get(device.id)
+    Map<Integer, Integer> regions = RegionUpdateBuffer.get(device.id)
     for (iter = regions.entrySet().iterator(); iter.hasNext();) {
         Map.Entry<Integer, Integer> entry = iter.next()
         iter.remove()
@@ -536,7 +523,8 @@ private void updateAttribute(String attribute, Object value, String unit = null,
     sendEvent(name: attribute, value: value, unit: unit, type: type, descriptionText: descriptionText)
 }
 
-@Field static final Map<String, Map> RegionCache = new ConcurrentHashMap<>().withDefault {
+// Buffer for region updates to reduce event overhead with high rates of change over 10 regions
+@Field static final Map<Integer, Map> RegionUpdateBuffer = new ConcurrentHashMap<>().withDefault {
     new ConcurrentHashMap<Integer, Integer>()
 }
 
@@ -617,7 +605,74 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 // Delay inbetween region updates to avoid bounces
 @Field static final int REGION_UPDATE_DELAY_MS = 500
 
-private String getPopupLink(String title) {
-    String url = 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Aqara/AqaraFP1DetectionGrid.html'
-    return """<a href='#' onClick="window.open('${url}','popUpGrid','height=450,width=300,left=100,top=200,resizable=no,scrollbars=no,toolbar=no,menubar=no,location=no,status=no');">${title}</a>"""
+private String getCalculatorStyle() {
+    return '''<style>
+        .box {
+            width: 20px;
+            height: 20px;
+            padding: 5px 20px 5px 20px;
+            border: 1px dotted black;
+        }
+        .selected {
+            background-color: blue;
+        }
+        .center {
+            margin: 5px auto 5px auto;
+        }
+    </style>
+    <script>
+        const numRows = 7;
+        const numCols = 4;
+        function createTable(tableId) {
+            const tableElement = document.getElementById(tableId);
+            for (let i = 1; i <= numRows; i++) {
+                let row = document.createElement('tr');
+                for (let j = 1; j <= numCols; j++) {
+                    let cell = document.createElement('td');
+                    cell.classList.add('box');
+                    cell.addEventListener('click', () => {
+                        if (cell.classList.contains('selected')) {
+                            cell.classList.remove('selected');
+                        } else {
+                            cell.classList.add('selected');
+                        }
+                        updateRowSums(tableElement);
+                    });
+                    row.appendChild(cell);
+                }
+                tableElement.appendChild(row);
+            }
+            $('document').ready(() => { populateTable(tableElement); });
+        }
+        function populateTable(tableElement) {
+            const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']")
+            const cells = tableElement.querySelectorAll('.box');
+            const sums = inputElem.value.split(',');
+            inputElem.style.display = 'none';
+            const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
+            for (let i = 0; i < cells.length; i++) {
+                let row = cells[i].parentNode.rowIndex;
+                let col = cells[i].cellIndex;
+                if (hasBitSet(sums[row], col)) {
+                    cells[i].classList.add('selected');
+                }
+            }
+        }
+        function updateRowSums(tableElement) {
+            const cells = tableElement.querySelectorAll('.box');
+            const sums = Array(numRows).fill(0);
+            for (let i = 0; i < cells.length; i++) {
+                if (cells[i].classList.contains('selected')) {
+                    let row = cells[i].parentNode.rowIndex;
+                    sums[row] += Math.pow(2, cells[i].cellIndex);
+                }
+            }
+            const inputElement = tableElement.parentElement.parentElement.querySelector("input[type='text']")
+            inputElement.value = sums.join(', ');
+        }
+    </script>'''
+}
+
+private String getCalculatorTable(String id) {
+    return """<table id="${id}" class="center"></table><script>createTable("${id}")</script>"""
 }
