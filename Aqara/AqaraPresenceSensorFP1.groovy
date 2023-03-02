@@ -27,11 +27,6 @@
  *  https://github.com/dresden-elektronik/deconz-rest-plugin/issues/5928#issuecomment-1166545226
  */
 
-/**
- *  1. Aqara states that sensor needs about 6s to detect presence (whether person stays or not)
- *  2. It determines within 30s that a person is no longer there
- *  3. 'Enter' should be PIR-like, which means as soon as sensors sees something
- */
 import groovy.transform.Field
 import hubitat.helper.HexUtils
 import hubitat.zigbee.zcl.DataType
@@ -39,8 +34,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 metadata {
     definition(name: 'Aqara Presence Sensor FP1',
-            importUrl: 'https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Aqara/AqaraPresenceSensorFP1.groovy',
-            namespace: 'aqara', author: 'Jonathan Bradshaw') {
+        importUrl: 'https://raw.githubusercontent.com/bradsjm/hubitat-dev/main/Aqara/AqaraPresenceSensorFP1.groovy',
+        namespace: 'aqara', author: 'Jonathan Bradshaw') {
         capability 'Configuration'
         capability 'Health Check'
         capability 'Motion Sensor'
@@ -49,7 +44,7 @@ metadata {
 
         command 'resetPresence'
 
-        attribute 'healthStatus', 'enum', [ 'unknown', 'offline', 'online' ]
+        attribute 'healthStatus', 'enum', ['unknown', 'offline', 'online']
         attribute 'activity', 'enum', PRESENCE_ACTIONS.values() as List<String>
         attribute 'region1', 'enum', REGION_ACTIONS.values() as List<String>
         attribute 'region2', 'enum', REGION_ACTIONS.values() as List<String>
@@ -66,34 +61,34 @@ metadata {
     }
 
     preferences {
-        input name: 'approachDistance', type: 'enum', title: getCalculatorStyle() + '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description:\
-            '<i>Maximum distance for detecting approach/away activity.</i>'
+        input name: 'approachDistance', type: 'enum', title: getCalculatorHeader() + '<b>Approach Distance</b>', options: ApproachDistanceOpts.options, defaultValue: ApproachDistanceOpts.defaultValue, description: \
+             '<i>Maximum distance for detecting approach/away activity.</i>'
 
-        input name: 'sensitivityLevel', type: 'enum', title: '<b>Motion Sensitivity</b>', options: SensitivityLevelOpts.options, defaultValue: SensitivityLevelOpts.defaultValue, description:\
-            '<i>Sensitivity of movement detection for determining presence.</i>'
+        input name: 'sensitivityLevel', type: 'enum', title: '<b>Motion Sensitivity</b>', options: SensitivityLevelOpts.options, defaultValue: SensitivityLevelOpts.defaultValue, description: \
+             '<i>Sensitivity of movement detection for determining presence.</i>'
 
-        input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description:\
-            '<i>Select capability mode for direction detection (left and right).</i>'
+        input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description: \
+             '<i>Select capability mode for direction detection (left and right).</i>'
 
-        input name: 'detectionRegion1', type: 'text', title: '<b>Detection Region #1</b>', description: getCalculatorTable('region1')
+        input name: 'detectionRegion1', type: 'text', title: '<b><span style="font-size: 1.2em">&#10122;</span> Detection Region</b>', description: getCalculatorTable('region1')
 
-        input name: 'detectionRegion2', type: 'text', title: '<b>Detection Region #2</b>', description: getCalculatorTable('region2')
+        input name: 'detectionRegion2', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10123;</span> Detection Region</b>', description: getCalculatorTable('region2')
 
-        input name: 'detectionRegion3', type: 'text', title: '<b>Detection Region #3</b>', description: getCalculatorTable('region3')
+        input name: 'detectionRegion3', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10124;</span> Detection Region</b>', description: getCalculatorTable('region3')
 
-        input name: 'detectionRegion4', type: 'text', title: '<b>Detection Region #4</b>', description: getCalculatorTable('region4')
+        input name: 'detectionRegion4', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10125;</span> Detection Region</b>', description: getCalculatorTable('region4')
 
-        input name: 'detectionRegion5', type: 'text', title: '<b>Detection Region #5</b>', description: getCalculatorTable('region5')
+        input name: 'detectionRegion5', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10126;</span> Detection Region</b>', description: getCalculatorTable('region5')
 
-        input name: 'detectionRegion6', type: 'text', title: '<b>Detection Region #6</b>', description: getCalculatorTable('region6')
+        input name: 'detectionRegion6', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10127;</span> Detection Region</b>', description: getCalculatorTable('region6')
 
-        input name: 'detectionRegion7', type: 'text', title: '<b>Detection Region #7</b>', description: getCalculatorTable('region7')
+        input name: 'detectionRegion7', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10128;</span> Detection Region</b>', description: getCalculatorTable('region7')
 
-        input name: 'detectionRegion8', type: 'text', title: '<b>Detection Region #8</b>', description: getCalculatorTable('region8')
+        input name: 'detectionRegion8', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10129;</span> Detection Region</b>', description: getCalculatorTable('region8')
 
-        input name: 'detectionRegion9', type: 'text', title: '<b>Detection Region #9</b>', description: getCalculatorTable('region9')
+        input name: 'detectionRegion9', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10130;</span> Detection Region</b>', description: getCalculatorTable('region9')
 
-        input name: 'detectionRegion10', type: 'text', title: '<b>Detection Region #10</b>', description: getCalculatorTable('region10')
+        input name: 'detectionRegion10', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10131;</span> Detection Region</b>', description: getCalculatorTable('region10')
 
         input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorTable('interference')
 
@@ -101,17 +96,17 @@ metadata {
 
         input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorTable('edges')
 
-        input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description:\
-            '<i>Reset presence if stuck for extended period of time.</i>'
+        input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description: \
+             '<i>Reset presence if stuck for extended period of time.</i>'
 
-        input name: 'healthCheckInterval', type: 'enum', title: '<b>Healthcheck Interval</b>', options: HealthcheckIntervalOpts.options, defaultValue: HealthcheckIntervalOpts.defaultValue, description:\
-            '<i>Changes how often the hub pings sensor to check health.</i>'
+        input name: 'healthCheckInterval', type: 'enum', title: '<b>Healthcheck Interval</b>', options: HealthcheckIntervalOpts.options, defaultValue: HealthcheckIntervalOpts.defaultValue, description: \
+             '<i>Changes how often the hub pings sensor to check health.</i>'
 
-        input name: 'txtEnable', type: 'bool', title: '<b>Enable descriptionText logging</b>', defaultValue: true, description:\
-            '<i>Enables command logging.</i>'
+        input name: 'txtEnable', type: 'bool', title: '<b>Enable descriptionText logging</b>', defaultValue: true, description: \
+             '<i>Enables logging of state changes.</i>'
 
-        input name: 'logEnable', type: 'bool', title: '<b>Enable debug logging</b>', defaultValue: false, description:\
-            '<i>Turns on debug logging for 30 minutes.</i>'
+        input name: 'logEnable', type: 'bool', title: '<b>Enable debug logging</b>', defaultValue: false, description: \
+             '<i>Turns on debug logging for 30 minutes.</i>'
     }
 }
 
@@ -121,52 +116,52 @@ List<String> configure() {
     List<String> cmds = []
     log.info 'configure...'
 
-    // Set motion sensitivity
+    // configure reporting for settings
+    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
+    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
+    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
+
     if (settings.sensitivityLevel) {
         log.info "setting sensitivity level to ${SensitivityLevelOpts.options[settings.sensitivityLevel as Integer]}"
         cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, settings.sensitivityLevel as Integer, MFG_CODE, DELAY_MS)
     }
 
-    // Set trigger distance
     if (settings.approachDistance) {
         log.info "setting approach distance to ${ApproachDistanceOpts.options[settings.approachDistance as Integer]}"
         cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, settings.approachDistance as Integer, MFG_CODE, DELAY_MS)
     }
 
-    // Enable left right detection
     if (settings.directionMode) {
         log.info "setting direction mode to ${DirectionModeOpts.options[settings.directionMode as Integer]}"
         cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, settings.directionMode as Integer, MFG_CODE, DELAY_MS)
     }
 
-    // Set detection regions
+    // Set or clear detection regions
     (1..10).each { int id ->
         String grid = settings["detectionRegion${id}"]
         if (grid && grid != '0, 0, 0, 0, 0, 0, 0') {
             log.info "setting detection region ${id} value to " + settings["detectionRegion${id}"]
-            cmds += setDetectionRegionAttribute(id, settings["detectionRegion${id}"].tokenize(',') as int[])
+            cmds += setDetectionRegionAttribute(id, grid.tokenize(',') as int[])
         } else {
-            log.info "removing detection region ${id}"
+            log.info "clearing detection region ${id}"
             cmds += setDetectionRegionAttribute(id, 0, 0, 0, 0, 0, 0, 0)
             device.deleteCurrentState("region${id}")
         }
     }
 
-    // Set interference region
     if (settings.interferenceRegion && settings.interferenceRegion != '0, 0, 0, 0, 0, 0, 0') {
         log.info 'setting detection interference region value to ' + settings.interferenceRegion
         cmds += setRegionAttribute(SET_INTERFERENCE_ATTR_ID, settings.interferenceRegion.tokenize(',') as int[])
     } else {
-        log.info 'removing detection interference region'
+        log.info 'clearing detection interference region'
         cmds += setRegionAttribute(SET_INTERFERENCE_ATTR_ID, 0, 0, 0, 0, 0, 0, 0)
     }
 
-    // Set exits/entrances region
     if (settings.exitEntrancesRegion && settings.exitEntrancesRegion != '0, 0, 0, 0, 0, 0, 0') {
         log.info 'setting exits/entrances region value to ' + settings.exitEntrancesRegion
         cmds += setRegionAttribute(SET_EXIT_REGION_ATTR_ID, settings.exitEntrancesRegion.tokenize(',') as int[])
     } else {
-        log.info 'removing exits/entrances region'
+        log.info 'clearing exits/entrances region'
         cmds += setRegionAttribute(SET_EXIT_REGION_ATTR_ID, 0, 0, 0, 0, 0, 0, 0)
     }
 
@@ -175,21 +170,16 @@ List<String> configure() {
         log.info 'setting edges region value to ' + settings.edgesRegion
         cmds += setRegionAttribute(SET_EDGE_REGION_ATTR_ID, settings.edgesRegion.tokenize(',') as int[])
     } else {
-        log.info 'removing edges region'
+        log.info 'clearing edges region'
         cmds += setRegionAttribute(SET_EDGE_REGION_ATTR_ID, 0, 0, 0, 0, 0, 0, 0)
     }
-
-    // Get configuration
-    cmds += zigbee.readAttribute(XIAOMI_CLUSTER_ID, [
-        SENSITIVITY_LEVEL_ATTR_ID,
-        TRIGGER_DISTANCE_ATTR_ID,
-        DIRECTION_MODE_ATTR_ID,
-    ], MFG_CODE, DELAY_MS)
 
     // Enable raw sensor data
     //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, 0x0155, DataType.UINT8, 0x01, MFG_CODE, DELAY_MS)
 
-    if (settings.logEnable) { log.debug "zigbee configure cmds: ${cmds}" }
+    if (settings.logEnable) {
+        log.debug "zigbee configure cmds: ${cmds}"
+    }
 
     return cmds
 }
@@ -219,7 +209,9 @@ void parse(String description) {
     unschedule('deviceCommandTimeout')
 
     if (descMap.isClusterSpecific == false) {
-        if (settings.logEnable) { log.trace "zigbee received global command message ${descMap}" }
+        if (settings.logEnable) {
+            log.trace "zigbee received global command message ${descMap}"
+        }
         parseGlobalCommands(descMap)
         return
     }
@@ -227,11 +219,11 @@ void parse(String description) {
     switch (descMap.clusterInt as Integer) {
         case zigbee.BASIC_CLUSTER:
             parseBasicCluster(descMap)
-            descMap.remove('additionalAttrs')?.each { m -> parseBasicCluster(descMap + m) }
+            descMap.remove('additionalAttrs')?.each { Map m -> parseBasicCluster(descMap + m) }
             break
         case XIAOMI_CLUSTER_ID:
             parseXiaomiCluster(descMap)
-            descMap.remove('additionalAttrs')?.each { m -> parseXiaomiCluster(descMap + m) }
+            descMap.remove('additionalAttrs')?.each { Map m -> parseXiaomiCluster(descMap + m) }
             break
         default:
             if (settings.logEnable) {
@@ -244,6 +236,7 @@ void parse(String description) {
 /*
  * Zigbee Basic Cluster Parsing
  */
+
 void parseBasicCluster(Map descMap) {
     if (settings.logEnable) {
         log.trace "zigbee received Basic cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
@@ -251,7 +244,9 @@ void parseBasicCluster(Map descMap) {
 
     switch (descMap.attrInt as Integer) {
         case PING_ATTR_ID: // Using 0x01 read as a simple ping/pong mechanism
-            if (settings.txtEnable) { log.info 'pong..' }
+            if (settings.txtEnable) {
+                log.info 'pong..'
+            }
             break
         default:
             log.warn "zigbee received unknown Basic cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
@@ -262,6 +257,7 @@ void parseBasicCluster(Map descMap) {
 /*
  * Zigbee Global Command Parsing
  */
+
 void parseGlobalCommands(Map descMap) {
     switch (hexStrToUnsignedInt(descMap.command)) {
         case 0x04: // write attribute response
@@ -292,6 +288,7 @@ void parseGlobalCommands(Map descMap) {
 /*
  * Zigbee Xiaomi Cluster Parsing
  */
+
 void parseXiaomiCluster(Map descMap) {
     if (settings.logEnable) {
         log.trace "zigbee received Xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
@@ -300,24 +297,11 @@ void parseXiaomiCluster(Map descMap) {
     switch (descMap.attrInt as Integer) {
         case PRESENCE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
-            if (settings.logEnable) { log.debug "xiaomi: presence attribute is ${value}" }
-            updateAttribute('presence', value == 0 ? 'not present' : 'present')
-            if (settings.presenceResetInterval && value) {
-                runIn((settings.presenceResetInterval as int) * 3600, 'resetPresence')
-            } else if (settings.presenceResetInterval) {
-                unschedule('resetPresence')
-            }
+            parseXiaomiClusterPresence(value)
             break
         case PRESENCE_ACTIONS_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
-            if (settings.logEnable) { log.debug "xiaomi: action attribute is ${value}" }
-            if (value <= 7) {
-                String activity = PRESENCE_ACTIONS.get(value)
-                updateAttribute('activity', activity)
-                updateAttribute('motion', value in [0, 2, 4, 6, 7] ? 'active' : 'inactive')
-            } else {
-                log.warn "unknown presence value ${value}"
-            }
+            parseXiaomiClusterPresenceEvent(value)
             break
         case REGION_EVENT_ATTR_ID:
             // Region events are sent fast and furious so we need to buffer them
@@ -325,53 +309,93 @@ void parseXiaomiCluster(Map descMap) {
             Integer value = HexUtils.hexStringToInt(descMap.value[2..3])
             RegionUpdateBuffer.get(device.id).put(regionId, value)
             runInMillis(REGION_UPDATE_DELAY_MS, 'updateRegions')
-            if (settings.logEnable) { log.debug "xiaomi: region ${regionId} action is ${value}" }
+            if (settings.logEnable) {
+                log.debug "xiaomi: region ${regionId} action is ${value}"
+            }
             break
         case SENSITIVITY_LEVEL_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
             log.info "sensitivity level is '${SensitivityLevelOpts.options[value]}' (0x${descMap.value})"
-            device.updateSetting('sensitivityLevel', [value: value.toString(), type: 'enum' ])
+            device.updateSetting('sensitivityLevel', [value: value.toString(), type: 'enum'])
             break
         case TRIGGER_DISTANCE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
             log.info "approach distance is '${ApproachDistanceOpts.options[value]}' (0x${descMap.value})"
-            device.updateSetting('approachDistance', [value: value.toString(), type: 'enum' ])
+            device.updateSetting('approachDistance', [value: value.toString(), type: 'enum'])
             break
         case DIRECTION_MODE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
             log.info "monitoring direction mode is '${DirectionModeOpts.options[value]}' (0x${descMap.value})"
-            device.updateSetting('directionMode', [value: value.toString(), type: 'enum' ])
+            device.updateSetting('directionMode', [value: value.toString(), type: 'enum'])
             break
-        case XIAOMI_TAGS_ATTR_ID:
-            Map tags = decodeXiaomiTags(descMap.value)
-            if (tags[SWBUILD_TAG_ID]) {
-                String swBuild = (tags[SWBUILD_TAG_ID] & 0xFF).toString().padLeft(4, '0')
-                device.updateDataValue('softwareBuild', swBuild)
-            }
+        case XIAOMI_TAGS_ATTR_ID: // sent every 5 minutes
+            Map<Integer, Integer> tags = decodeXiaomiTags(descMap.value)
+            parseXiaomiClusterTags(tags)
             break
-        // case XIAOMI_RAW_ATTR_ID:
-        //     byte[] rawData = HexUtils.hexStringToByteArray(descMap.value)
-        //     int distanceCm = new BigInteger((byte[])[rawData[17], rawData[18]]).toInteger()
-        //     log.debug "distance ${distanceCm}cm"
-        //     break
+            // case XIAOMI_RAW_ATTR_ID:
+            //     byte[] rawData = HexUtils.hexStringToByteArray(descMap.value)
+            //     int distanceCm = new BigInteger((byte[])[rawData[17], rawData[18]]).toInteger()
+            //     log.debug "distance ${distanceCm}cm"
+            //     break
         default:
             log.warn "zigbee received unknown Xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
             break
     }
 }
 
-void updateRegions() {
-    if (settings.logEnable) { log.debug 'processing region cache' }
-    Map<Integer, Integer> regions = RegionUpdateBuffer.get(device.id)
-    for (iter = regions.entrySet().iterator(); iter.hasNext();) {
-        Map.Entry<Integer, Integer> entry = iter.next()
-        iter.remove()
-        updateAttribute("region${entry.key}", REGION_ACTIONS.get(entry.value))
+void parseXiaomiClusterPresence(Integer value) {
+    if (settings.logEnable) {
+        log.debug "xiaomi: presence attribute is ${value}"
+    }
+    updateAttribute('presence', value == 0 ? 'not present' : 'present')
+
+    if (settings.presenceResetInterval && value) {
+        runIn((settings.presenceResetInterval as int) * 3600, 'resetPresence')
+    } else if (settings.presenceResetInterval) {
+        unschedule('resetPresence')
+    }
+}
+
+void parseXiaomiClusterPresenceEvent(Integer value) {
+    if (settings.logEnable) {
+        log.debug "xiaomi: action attribute is ${value}"
+    }
+    if (value <= 7) {
+        String activity = PRESENCE_ACTIONS.get(value)
+        updateAttribute('activity', activity)
+        updateAttribute('motion', value in [0, 2, 4, 6, 7] ? 'active' : 'inactive')
+    } else {
+        log.warn "unknown presence value ${value}"
+    }
+}
+
+void parseXiaomiClusterTags(Map<Integer, Integer> tags) {
+    if (settings.logEnable) {
+        log.debug "xiaomi: decoded tags ${tags}"
+    }
+    tags.each { Integer tag, Object value ->
+        switch (tag) {
+            case SWBUILD_TAG_ID:
+                String swBuild = (value.toInteger() & 0xFF).toString().padLeft(4, '0')
+                device.updateDataValue('softwareBuild', swBuild)
+                break
+            case 0x66:
+                device.updateSetting('sensitivityLevel', [value: value.toString(), type: 'enum'])
+                break
+            case 0x67:
+                device.updateSetting('directionMode', [value: value.toString(), type: 'enum'])
+                break
+            case 0x69:
+                device.updateSetting('approachDistance', [value: value.toString(), type: 'enum'])
+                break
+        }
     }
 }
 
 List<String> ping() {
-    if (settings.txtEnable) { log.info 'ping...' }
+    if (settings.txtEnable) {
+        log.info 'ping...'
+    }
     // Using attribute 0x00 as a simple ping/pong mechanism
     scheduleCommandTimeoutCheck()
     return zigbee.readAttribute(zigbee.BASIC_CLUSTER, PING_ATTR_ID, [:], 0)
@@ -401,7 +425,21 @@ void updated() {
         scheduleDeviceHealthCheck(interval)
     }
 
+    if (settings.presenceResetInterval && device.currentValue('presence') == 'present') {
+        runIn((settings.presenceResetInterval as int) * 3600, 'resetPresence')
+    }
+
     runIn(1, 'configure')
+}
+
+void updateRegions() {
+    if (settings.logEnable) { log.debug 'processing region cache' }
+    Map<Integer, Integer> regions = RegionUpdateBuffer.get(device.id)
+    for (iter = regions.entrySet().iterator(); iter.hasNext();) {
+        Map.Entry<Integer, Integer> entry = iter.next()
+        iter.remove()
+        updateAttribute("region${entry.key}", REGION_ACTIONS.get(entry.value))
+    }
 }
 
 /**
@@ -413,7 +451,7 @@ private static BigInteger readBigIntegerBytes(ByteArrayInputStream stream, int l
     stream.read(byteArr, 0, length)
     BigInteger bigInt = BigInteger.ZERO
     for (int i = byteArr.length - 1; i >= 0; i--) {
-        bigInt = bigInt | (BigInteger.valueOf((byteArr[i] & 0xFF) << (8 * i)))
+        bigInt |= (BigInteger.valueOf((byteArr[i] & 0xFF) << (8 * i)))
     }
     return bigInt
 }
@@ -451,9 +489,6 @@ private Map<Integer, Object> decodeXiaomiTags(String hexString) {
                 value = readBigIntegerBytes(stream, length)
             }
             results[tag] = value
-            if (settings.logEnable) {
-                log.debug "Xiaomi decode tag=0x${HexUtils.integerToHexString(tag, 2)}, dataType=0x${HexUtils.integerToHexString(dataType, 2)}, value=${value}"
-            }
         }
     }
     return results
@@ -475,7 +510,7 @@ private void scheduleDeviceHealthCheck(int intervalMins) {
  *  rows of the grid. It checks if the region ID and grid values are valid, and returns an
  *  empty list if they are not.
  */
-private List<String> setDetectionRegionAttribute(int regionId, int... grid) {
+private List<String> setDetectionRegionAttribute(int regionId, int ... grid) {
     if (regionId < 1 || regionId > 10) {
         log.error 'region must be between 1 and 10'
         return []
@@ -485,11 +520,11 @@ private List<String> setDetectionRegionAttribute(int regionId, int... grid) {
         return []
     }
 
-    String octetStr = '07020' + HEX_CHARS[(int)regionId] + '0000000000'
+    String octetStr = '07020' + HEX_CHARS[(int) regionId] + '0000000000'
     if (grid.sum() > 0) {
         octetStr = new StringBuilder()
             .append('07010')
-            .append(HEX_CHARS[(int)regionId])
+            .append(HEX_CHARS[(int) regionId])
             .append(HEX_CHARS[grid[1]])
             .append(HEX_CHARS[grid[0]])
             .append(HEX_CHARS[grid[3]])
@@ -500,18 +535,20 @@ private List<String> setDetectionRegionAttribute(int regionId, int... grid) {
             .append(HEX_CHARS[grid[6]])
             .append('FF')
     }
-    if (settings.logEnable) { log.debug "set region ${regionId} to ${octetStr}" }
+    if (settings.logEnable) {
+        log.debug "set region ${regionId} to ${octetStr}"
+    }
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, DataType.STRING_OCTET, octetStr, MFG_CODE, DELAY_MS)
 }
 
-private List<String> setRegionAttribute(int attribute, int... grid) {
+private List<String> setRegionAttribute(int attribute, int ... grid) {
     if (grid.size() != 7) {
         log.error 'grid must contain exactly 7 row values'
         return []
     }
     StringBuilder hexString = new StringBuilder('0')
     for (int i = 6; i >= 0; i--) {
-        hexString.append(HEX_CHARS[grid[i]])
+        hexString.append HEX_CHARS[grid[i]]
     }
     return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, attribute, DataType.UINT32, hexString.toString(), MFG_CODE, DELAY_MS)
 }
@@ -569,32 +606,32 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final int XIAOMI_TAGS_ATTR_ID = 0x00F7
 @Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
 @Field static final int XIAOMI_RAW_ATTR_ID = 0xFFF2
-@Field static final Map MFG_CODE = [ mfgCode: 0x115F ]
+@Field static final Map MFG_CODE = [mfgCode: 0x115F]
 
 // Configuration options
 @Field static final Map ApproachDistanceOpts = [
     defaultValue: 0x00,
-    options: [ 0x00: 'Far (3m)', 0x01: 'Medium (2m)', 0x02: 'Near (1m)' ]
+    options     : [0x00: 'Far (3m)', 0x01: 'Medium (2m)', 0x02: 'Near (1m)']
 ]
 
 @Field static final Map SensitivityLevelOpts = [
     defaultValue: 0x03,
-    options: [ 0x01: 'Low', 0x02: 'Medium', 0x03: 'High' ]
+    options     : [0x01: 'Low', 0x02: 'Medium', 0x03: 'High']
 ]
 
 @Field static final Map DirectionModeOpts = [
     defaultValue: 0x00,
-    options: [ 0x00: 'Undirected Enter/Leave', 0x01: 'Left & Right Enter/Leave' ]
+    options     : [0x00: 'Undirected Enter/Leave', 0x01: 'Left & Right Enter/Leave']
 ]
 
 @Field static final Map HealthcheckIntervalOpts = [
     defaultValue: 10,
-    options: [ 10: 'Every 10 Mins', 15: 'Every 15 Mins', 30: 'Every 30 Mins', 45: 'Every 45 Mins', 59: 'Every Hour', 00: 'Disabled' ]
+    options     : [10: 'Every 10 Mins', 15: 'Every 15 Mins', 30: 'Every 30 Mins', 45: 'Every 45 Mins', 59: 'Every Hour', 00: 'Disabled']
 ]
 
 @Field static final Map PresenceResetOpts = [
     defaultValue: 0,
-    options: [ 0: 'Disabled', 60: 'After 1 Hour', 2: 'After 2 Hours', 4: 'After 4 Hours', 8: 'After 8 Hours', 12: 'After 12 Hours' ]
+    options     : [0: 'Disabled', 60: 'After 1 Hour', 2: 'After 2 Hours', 4: 'After 4 Hours', 8: 'After 8 Hours', 12: 'After 12 Hours']
 ]
 
 // Command timeout before setting healthState to offline
@@ -606,7 +643,10 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 // Delay inbetween region updates to avoid bounces
 @Field static final int REGION_UPDATE_DELAY_MS = 500
 
-private String getCalculatorStyle() {
+/**
+ * User interface region calculator
+ */
+private String getCalculatorHeader() {
     return '''<style>
         .box {
             width: 20px;
@@ -649,8 +689,8 @@ private String getCalculatorStyle() {
             const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']")
             const cells = tableElement.querySelectorAll('.box');
             const sums = inputElem.value.split(',');
-            inputElem.style.display = 'none';
             const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
+            inputElem.style.display = 'none';
             for (let i = 0; i < cells.length; i++) {
                 let row = cells[i].parentNode.rowIndex;
                 let col = cells[i].cellIndex;
@@ -675,5 +715,5 @@ private String getCalculatorStyle() {
 }
 
 private String getCalculatorTable(String id) {
-    return """<table id="${id}" class="center"></table><script>createTable("${id}")</script>"""
+    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="center"></table><script>createTable("${id}")</script>"""
 }
