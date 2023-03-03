@@ -680,56 +680,62 @@ private String getCalculatorHeader() {
     <script>
         const numRows = 7;
         const numCols = 4;
+
         function createTable(tableId) {
             const tableElement = document.getElementById(tableId);
-            for (let i = 1; i <= numRows; i++) {
-                let row = document.createElement('tr');
-                for (let j = 1; j <= numCols; j++) {
-                    let cell = document.createElement('td');
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < numRows; i++) {
+                const row = document.createElement('tr');
+                for (let j = 0; j < numCols; j++) {
+                    const cell = document.createElement('td');
                     cell.classList.add('box');
-                    cell.addEventListener('click', () => {
-                        if (cell.classList.contains('selected')) {
-                            cell.classList.remove('selected');
-                        } else {
-                            cell.classList.add('selected');
-                        }
-                        updateRowSums(tableElement);
-                    });
                     row.appendChild(cell);
                 }
-                tableElement.appendChild(row);
+                fragment.appendChild(row);
             }
-            $('document').ready(() => { populateTable(tableElement); });
+            tableElement.appendChild(fragment);
+
+            tableElement.addEventListener('click', (event) => {
+                if (event.target.classList.contains('box')) {
+                    event.target.classList.toggle('selected');
+                    updateRowSums(tableElement);
+                }
+            });
+
+            populateTable(tableElement);
         }
+
         function populateTable(tableElement) {
-            const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']")
+            const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']");
             const cells = tableElement.querySelectorAll('.box');
             const sums = inputElem.value.split(',');
             const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
             inputElem.style.display = 'none';
             for (let i = 0; i < cells.length; i++) {
-                let row = cells[i].parentNode.rowIndex;
-                let col = cells[i].cellIndex;
+                const row = Math.floor(i / numCols);
+                const col = i % numCols;
                 if (hasBitSet(sums[row], col)) {
                     cells[i].classList.add('selected');
                 }
             }
         }
+
         function updateRowSums(tableElement) {
             const cells = tableElement.querySelectorAll('.box');
             const sums = Array(numRows).fill(0);
             for (let i = 0; i < cells.length; i++) {
                 if (cells[i].classList.contains('selected')) {
-                    let row = cells[i].parentNode.rowIndex;
-                    sums[row] += Math.pow(2, cells[i].cellIndex);
+                    const row = Math.floor(i / numCols);
+                    const col = i % numCols;
+                    sums[row] += 1 << col;
                 }
             }
-            const inputElement = tableElement.parentElement.parentElement.querySelector("input[type='text']")
+            const inputElement = tableElement.parentElement.parentElement.querySelector("input[type='text']");
             inputElement.value = sums.join(', ');
         }
     </script>'''
 }
 
 private String getCalculatorTable(String id) {
-    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="center"></table><script>createTable("${id}")</script>"""
+    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="center"></table><script>\$('document').ready(() => createTable("${id}"))</script>"""
 }
