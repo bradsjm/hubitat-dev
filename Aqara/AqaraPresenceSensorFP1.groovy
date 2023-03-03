@@ -70,31 +70,31 @@ metadata {
         input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description: \
              '<i>Select capability mode for direction detection (left and right).</i>'
 
-        input name: 'detectionRegion1', type: 'text', title: '<b><span style="font-size: 1.2em">&#10122;</span> Detection Region</b>', description: getCalculatorTable('region1')
+        input name: 'detectionRegion1', type: 'text', title: '<b><span style="font-size: 1.2em">&#10122;</span> Detection Region</b>', description: getCalculatorGrid('region1')
 
-        input name: 'detectionRegion2', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10123;</span> Detection Region</b>', description: getCalculatorTable('region2')
+        input name: 'detectionRegion2', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10123;</span> Detection Region</b>', description: getCalculatorGrid('region2')
 
-        input name: 'detectionRegion3', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10124;</span> Detection Region</b>', description: getCalculatorTable('region3')
+        input name: 'detectionRegion3', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10124;</span> Detection Region</b>', description: getCalculatorGrid('region3')
 
-        input name: 'detectionRegion4', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10125;</span> Detection Region</b>', description: getCalculatorTable('region4')
+        input name: 'detectionRegion4', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10125;</span> Detection Region</b>', description: getCalculatorGrid('region4')
 
-        input name: 'detectionRegion5', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10126;</span> Detection Region</b>', description: getCalculatorTable('region5')
+        input name: 'detectionRegion5', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10126;</span> Detection Region</b>', description: getCalculatorGrid('region5')
 
-        input name: 'detectionRegion6', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10127;</span> Detection Region</b>', description: getCalculatorTable('region6')
+        input name: 'detectionRegion6', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10127;</span> Detection Region</b>', description: getCalculatorGrid('region6')
 
-        input name: 'detectionRegion7', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10128;</span> Detection Region</b>', description: getCalculatorTable('region7')
+        input name: 'detectionRegion7', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10128;</span> Detection Region</b>', description: getCalculatorGrid('region7')
 
-        input name: 'detectionRegion8', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10129;</span> Detection Region</b>', description: getCalculatorTable('region8')
+        input name: 'detectionRegion8', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10129;</span> Detection Region</b>', description: getCalculatorGrid('region8')
 
-        input name: 'detectionRegion9', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10130;</span> Detection Region</b>', description: getCalculatorTable('region9')
+        input name: 'detectionRegion9', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10130;</span> Detection Region</b>', description: getCalculatorGrid('region9')
 
-        input name: 'detectionRegion10', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10131;</span> Detection Region</b>', description: getCalculatorTable('region10')
+        input name: 'detectionRegion10', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10131;</span> Detection Region</b>', description: getCalculatorGrid('region10')
 
-        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorTable('interference')
+        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorGrid('interference')
 
-        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorTable('exitentrances')
+        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorGrid('exitentrances')
 
-        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorTable('edges')
+        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorGrid('edges')
 
         input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description: \
              '<i>Reset presence if stuck for extended period of time.</i>'
@@ -116,24 +116,27 @@ List<String> configure() {
     List<String> cmds = []
     log.info 'configure...'
 
+    // Voodoo magik, writing the the Xiamoi Cluster Raw Attribute seems to be needed to complete pairing
+    cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00 00 00 00 00 00 00 00', [:], DELAY_MS)
+
     // configure reporting for settings
-    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
-    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
-    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
+    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
+    cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
 
     if (settings.sensitivityLevel) {
         log.info "setting sensitivity level to ${SensitivityLevelOpts.options[settings.sensitivityLevel as Integer]}"
-        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, settings.sensitivityLevel as Integer, MFG_CODE, DELAY_MS)
+        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, settings.sensitivityLevel as Integer, [:], DELAY_MS)
     }
 
     if (settings.approachDistance) {
         log.info "setting approach distance to ${ApproachDistanceOpts.options[settings.approachDistance as Integer]}"
-        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, settings.approachDistance as Integer, MFG_CODE, DELAY_MS)
+        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, settings.approachDistance as Integer, [:], DELAY_MS)
     }
 
     if (settings.directionMode) {
         log.info "setting direction mode to ${DirectionModeOpts.options[settings.directionMode as Integer]}"
-        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, settings.directionMode as Integer, MFG_CODE, DELAY_MS)
+        cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, settings.directionMode as Integer, [:], DELAY_MS)
     }
 
     // Set or clear detection regions
@@ -175,11 +178,14 @@ List<String> configure() {
     }
 
     // Enable raw sensor data
-    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, 0x0155, DataType.UINT8, 0x01, MFG_CODE, DELAY_MS)
+    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, 0x0155, DataType.UINT8, 0x01, [:], DELAY_MS)
 
     if (settings.logEnable) {
         log.debug "zigbee configure cmds: ${cmds}"
     }
+
+    // Check it didn't stop responding after pairing completed
+    runIn(10, 'ping')
 
     return cmds
 }
@@ -245,6 +251,9 @@ void parseBasicCluster(Map descMap) {
                 log.info 'pong..'
             }
             break
+        case MODEL_ATTR_ID:
+            log.info "device model identifier: ${descMap.value}"
+            break
         default:
             log.warn "zigbee received unknown Basic cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
             break
@@ -302,6 +311,9 @@ void parseXiaomiCluster(Map descMap) {
     }
 
     switch (descMap.attrInt as Integer) {
+        case 0x00FC:
+            log.info 'unknown attribute - maybe resetting?'
+            break
         case PRESENCE_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
             parseXiaomiClusterPresence(value)
@@ -419,7 +431,7 @@ List<String> resetPresence() {
     updateAttribute('motion', 'inactive')
     updateAttribute('presence', 'not present')
     updateAttribute('activity', 'leave')
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, RESET_PRESENCE_ATTR_ID, DataType.UINT8, 0x01, MFG_CODE, 0)
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, RESET_PRESENCE_ATTR_ID, DataType.UINT8, 0x01, [:], 0)
 }
 
 void updated() {
@@ -453,6 +465,87 @@ void updateRegions() {
         iter.remove()
         updateAttribute("region${entry.key}", REGION_ACTIONS.get(entry.value))
     }
+}
+
+/**
+ * User interface region calculator
+ */
+private static String getCalculatorGrid(String id) {
+    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="fp1-grid"></table><script>\$('document').ready(() => fp1CreateTable("${id}"))</script>"""
+}
+
+private static String getCalculatorHeader() {
+    return '''<style>
+        .fp1-grid {
+            margin: 5px auto 5px auto;
+        }
+        .fp1-grid-box {
+            width: 20px;
+            height: 20px;
+            padding: 5px 20px 5px 20px;
+            border: 1px dotted black;
+        }
+        .fp1-grid-box-selected {
+            background-color: blue;
+        }
+    </style>
+    <script>
+        const numRows = 7;
+        const numCols = 4;
+
+        function fp1CreateTable(tableId) {
+            const tableElement = document.getElementById(tableId);
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < numRows; i++) {
+                const row = document.createElement('tr');
+                for (let j = 0; j < numCols; j++) {
+                    const cell = document.createElement('td');
+                    cell.classList.add('fp1-grid-box');
+                    row.appendChild(cell);
+                }
+                fragment.appendChild(row);
+            }
+            tableElement.appendChild(fragment);
+
+            tableElement.addEventListener('click', (event) => {
+                if (event.target.classList.contains('fp1-grid-box')) {
+                    event.target.classList.toggle('fp1-grid-box-selected');
+                    fp1UpdateRowSums(tableElement);
+                }
+            });
+
+            fp1PopulateTable(tableElement);
+        }
+
+        function fp1PopulateTable(tableElement) {
+            const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']");
+            const cells = tableElement.querySelectorAll('.box');
+            const sums = inputElem.value.split(',');
+            const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
+            inputElem.style.display = 'none';
+            for (let i = 0; i < cells.length; i++) {
+                const row = Math.floor(i / numCols);
+                const col = i % numCols;
+                if (hasBitSet(sums[row], col)) {
+                    cells[i].classList.add('selected');
+                }
+            }
+        }
+
+        function fp1UpdateRowSums(tableElement) {
+            const cells = tableElement.querySelectorAll('.box');
+            const sums = Array(numRows).fill(0);
+            for (let i = 0; i < cells.length; i++) {
+                if (cells[i].classList.contains('selected')) {
+                    const row = Math.floor(i / numCols);
+                    const col = i % numCols;
+                    sums[row] += 1 << col;
+                }
+            }
+            const inputElement = tableElement.parentElement.parentElement.querySelector("input[type='text']");
+            inputElement.value = sums.join(', ');
+        }
+    </script>'''
 }
 
 /**
@@ -551,7 +644,7 @@ private List<String> setDetectionRegionAttribute(int regionId, int ... grid) {
     if (settings.logEnable) {
         log.debug "set region ${regionId} to ${octetStr}"
     }
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, DataType.STRING_OCTET, octetStr, MFG_CODE, DELAY_MS)
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, SET_REGION_ATTR_ID, DataType.STRING_OCTET, octetStr, [:], DELAY_MS)
 }
 
 private List<String> setRegionAttribute(int attribute, int ... grid) {
@@ -563,7 +656,7 @@ private List<String> setRegionAttribute(int attribute, int ... grid) {
     for (int i = 6; i >= 0; i--) {
         hexString.append HEX_CHARS[grid[i]]
     }
-    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, attribute, DataType.UINT32, hexString.toString(), MFG_CODE, DELAY_MS)
+    return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, attribute, DataType.UINT32, hexString.toString(), [:], DELAY_MS)
 }
 
 private void updateAttribute(String attribute, Object value, String unit = null, String type = 'digital') {
@@ -605,6 +698,7 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 // Zigbee Cluster, Attribute and Xiaomi Tag IDs
 @Field static final int DIRECTION_MODE_ATTR_ID = 0x0144
 @Field static final int DIRECTION_MODE_TAG_ID = 0x67
+@Field static final int MODEL_ATTR_ID = 0x05
 @Field static final int PING_ATTR_ID = 0x01
 @Field static final int PRESENCE_ACTIONS_ATTR_ID = 0x0143
 @Field static final int PRESENCE_ATTR_ID = 0x0142
@@ -622,7 +716,6 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
 @Field static final int XIAOMI_RAW_ATTR_ID = 0xFFF2
 @Field static final int XIAOMI_SPECIAL_REPORT_ID = 0x00F7
-@Field static final Map MFG_CODE = [mfgCode: 0x115F]
 
 // Configuration options
 @Field static final Map ApproachDistanceOpts = [
@@ -658,84 +751,3 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 
 // Delay inbetween region updates to avoid bounces
 @Field static final int REGION_UPDATE_DELAY_MS = 500
-
-/**
- * User interface region calculator
- */
-private String getCalculatorHeader() {
-    return '''<style>
-        .box {
-            width: 20px;
-            height: 20px;
-            padding: 5px 20px 5px 20px;
-            border: 1px dotted black;
-        }
-        .selected {
-            background-color: blue;
-        }
-        .center {
-            margin: 5px auto 5px auto;
-        }
-    </style>
-    <script>
-        const numRows = 7;
-        const numCols = 4;
-
-        function createTable(tableId) {
-            const tableElement = document.getElementById(tableId);
-            const fragment = document.createDocumentFragment();
-            for (let i = 0; i < numRows; i++) {
-                const row = document.createElement('tr');
-                for (let j = 0; j < numCols; j++) {
-                    const cell = document.createElement('td');
-                    cell.classList.add('box');
-                    row.appendChild(cell);
-                }
-                fragment.appendChild(row);
-            }
-            tableElement.appendChild(fragment);
-
-            tableElement.addEventListener('click', (event) => {
-                if (event.target.classList.contains('box')) {
-                    event.target.classList.toggle('selected');
-                    updateRowSums(tableElement);
-                }
-            });
-
-            populateTable(tableElement);
-        }
-
-        function populateTable(tableElement) {
-            const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']");
-            const cells = tableElement.querySelectorAll('.box');
-            const sums = inputElem.value.split(',');
-            const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
-            inputElem.style.display = 'none';
-            for (let i = 0; i < cells.length; i++) {
-                const row = Math.floor(i / numCols);
-                const col = i % numCols;
-                if (hasBitSet(sums[row], col)) {
-                    cells[i].classList.add('selected');
-                }
-            }
-        }
-
-        function updateRowSums(tableElement) {
-            const cells = tableElement.querySelectorAll('.box');
-            const sums = Array(numRows).fill(0);
-            for (let i = 0; i < cells.length; i++) {
-                if (cells[i].classList.contains('selected')) {
-                    const row = Math.floor(i / numCols);
-                    const col = i % numCols;
-                    sums[row] += 1 << col;
-                }
-            }
-            const inputElement = tableElement.parentElement.parentElement.querySelector("input[type='text']");
-            inputElement.value = sums.join(', ');
-        }
-    </script>'''
-}
-
-private String getCalculatorTable(String id) {
-    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="center"></table><script>\$('document').ready(() => createTable("${id}"))</script>"""
-}
