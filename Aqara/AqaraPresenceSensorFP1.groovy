@@ -519,7 +519,7 @@ private static String getCalculatorHeader() {
 
         function fp1PopulateTable(tableElement) {
             const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']");
-            const cells = tableElement.querySelectorAll('.box');
+            const cells = tableElement.querySelectorAll('.fp1-grid-box');
             const sums = inputElem.value.split(',');
             const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
             inputElem.style.display = 'none';
