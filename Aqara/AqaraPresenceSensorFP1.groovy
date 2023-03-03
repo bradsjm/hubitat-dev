@@ -209,9 +209,6 @@ void parse(String description) {
     unschedule('deviceCommandTimeout')
 
     if (descMap.isClusterSpecific == false) {
-        if (settings.logEnable) {
-            log.trace "zigbee received global command message ${descMap}"
-        }
         parseGlobalCommands(descMap)
         return
     }
@@ -260,13 +257,18 @@ void parseBasicCluster(Map descMap) {
 
 void parseGlobalCommands(Map descMap) {
     switch (hexStrToUnsignedInt(descMap.command)) {
+        case 0x00:
+            if (settings.logEnable) {
+                log.trace "zigbee ${clusterLookup(descMap.clusterInt)} response: ${descMap.data}"
+            }
+            break
         case 0x04: // write attribute response
             int statusCode = hexStrToUnsignedInt(descMap.data in List ? descMap.data[0] : descMap.data)
             String status = "0x${intToHexStr(statusCode)}"
             if (settings.logEnable) {
-                log.trace "zigbee response write ${clusterLookup(descMap.clusterInt)} attribute response: ${status}"
+                log.trace "zigbee write ${clusterLookup(descMap.clusterInt)} attribute response: ${status}"
             } else if (statusCode != 0x00) {
-                log.warn "zigbee response write ${clusterLookup(descMap.clusterInt)} attribute error: ${status}"
+                log.warn "zigbee write ${clusterLookup(descMap.clusterInt)} attribute error: ${status}"
             }
             break
         case 0x07: // configure reporting response
@@ -282,6 +284,11 @@ void parseGlobalCommands(Map descMap) {
                 log.warn "zigbee command error (${clusterLookup(descMap.clusterInt)}, command: 0x${commandId}) ${status}"
             }
             break
+        default:
+            if (settings.logEnable) {
+                log.trace "zigbee received global command message ${descMap}"
+            }
+            break
     }
 }
 
@@ -291,7 +298,7 @@ void parseGlobalCommands(Map descMap) {
 
 void parseXiaomiCluster(Map descMap) {
     if (settings.logEnable) {
-        log.trace "zigbee received Xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
+        log.trace "zigbee received xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
     }
 
     switch (descMap.attrInt as Integer) {
@@ -328,7 +335,7 @@ void parseXiaomiCluster(Map descMap) {
             log.info "monitoring direction mode is '${DirectionModeOpts.options[value]}' (0x${descMap.value})"
             device.updateSetting('directionMode', [value: value.toString(), type: 'enum'])
             break
-        case XIAOMI_TAGS_ATTR_ID: // sent every 5 minutes
+        case XIAOMI_SPECIAL_REPORT_ID: // sent every 5 minutes
             Map<Integer, Integer> tags = decodeXiaomiTags(descMap.value)
             parseXiaomiClusterTags(tags)
             break
@@ -369,24 +376,30 @@ void parseXiaomiClusterPresenceEvent(Integer value) {
     }
 }
 
-void parseXiaomiClusterTags(Map<Integer, Integer> tags) {
-    if (settings.logEnable) {
-        log.debug "xiaomi: decoded tags ${tags}"
-    }
+void parseXiaomiClusterTags(Map<Integer, Object> tags) {
     tags.each { Integer tag, Object value ->
         switch (tag) {
             case SWBUILD_TAG_ID:
                 String swBuild = (value.toInteger() & 0xFF).toString().padLeft(4, '0')
+                if (settings.logEnable) { log.debug "xiaomi tag: swBuild (value ${swBuild})" }
                 device.updateDataValue('softwareBuild', swBuild)
                 break
-            case 0x66:
+            case SENSITIVITY_LEVEL_TAG_ID:
+                if (settings.logEnable) { log.debug "xiaomi tag: sensitivityLevel (value ${value})" }
                 device.updateSetting('sensitivityLevel', [value: value.toString(), type: 'enum'])
                 break
-            case 0x67:
+            case DIRECTION_MODE_TAG_ID:
+                if (settings.logEnable) { log.debug "xiaomi tag: directionMode (value ${value})" }
                 device.updateSetting('directionMode', [value: value.toString(), type: 'enum'])
                 break
-            case 0x69:
+            case TRIGGER_DISTANCE_TAG_ID:
+                if (settings.logEnable) { log.debug "xiaomi tag: approachDistance (value ${value})" }
                 device.updateSetting('approachDistance', [value: value.toString(), type: 'enum'])
+                break
+            default:
+                if (settings.logEnable) {
+                    log.debug "xiaomi decode tag: 0x${intToHexStr(tag, 1)}=${value & 0xFF}"
+                }
                 break
         }
     }
@@ -463,7 +476,7 @@ private String clusterLookup(Object cluster) {
         String hex = "0x${intToHexStr(clusterInt, 2)}"
         return label ? "${label} (${hex}) cluster" : "cluster ${hex}"
     }
-    return 'unknown'
+    return 'unknown cluster'
 }
 
 /**
@@ -591,21 +604,24 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 
 // Zigbee Cluster, Attribute and Xiaomi Tag IDs
 @Field static final int DIRECTION_MODE_ATTR_ID = 0x0144
+@Field static final int DIRECTION_MODE_TAG_ID = 0x67
 @Field static final int PING_ATTR_ID = 0x01
-@Field static final int PRESENCE_ATTR_ID = 0x0142
 @Field static final int PRESENCE_ACTIONS_ATTR_ID = 0x0143
+@Field static final int PRESENCE_ATTR_ID = 0x0142
 @Field static final int REGION_EVENT_ATTR_ID = 0x0151
 @Field static final int RESET_PRESENCE_ATTR_ID = 0x0157
 @Field static final int SENSITIVITY_LEVEL_ATTR_ID = 0x010C
+@Field static final int SENSITIVITY_LEVEL_TAG_ID = 0x66
 @Field static final int SET_EDGE_REGION_ATTR_ID = 0x0156
 @Field static final int SET_EXIT_REGION_ATTR_ID = 0x0153
 @Field static final int SET_INTERFERENCE_ATTR_ID = 0x0154
 @Field static final int SET_REGION_ATTR_ID = 0x0150
 @Field static final int SWBUILD_TAG_ID = 0x08
 @Field static final int TRIGGER_DISTANCE_ATTR_ID = 0x0146
-@Field static final int XIAOMI_TAGS_ATTR_ID = 0x00F7
+@Field static final int TRIGGER_DISTANCE_TAG_ID = 0x69
 @Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
 @Field static final int XIAOMI_RAW_ATTR_ID = 0xFFF2
+@Field static final int XIAOMI_SPECIAL_REPORT_ID = 0x00F7
 @Field static final Map MFG_CODE = [mfgCode: 0x115F]
 
 // Configuration options
