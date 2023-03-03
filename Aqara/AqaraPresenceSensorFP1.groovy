@@ -117,7 +117,10 @@ List<String> configure() {
     log.info 'configure...'
 
     // Voodoo magik, writing the the Xiamoi Cluster Raw Attribute seems to be needed to complete pairing
-    cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00 00 00 00 00 00 00 00', [:], DELAY_MS)
+    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00 00 00 00 00 00 00 00', [:], DELAY_MS)
+    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, 'AA 74 02 44 00 9C 03 20', [:], DELAY_MS)
+    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, 'AA 74 02 44 01 9B 01 20', [:], DELAY_MS)
+    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, 0x00FF, DataType.STRING_OCTET, '10 89 34 86 38 41 04 19 89 90 79 74 27 27 80 18 45', [:], DELAY_MS)
 
     // configure reporting for settings
     cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
@@ -368,9 +371,9 @@ void parseXiaomiClusterPresence(Integer value) {
     }
     updateAttribute('presence', value == 0 ? 'not present' : 'present')
 
-    if (settings.presenceResetInterval && value) {
-        runIn((settings.presenceResetInterval as int) * 3600, 'resetPresence')
-    } else if (settings.presenceResetInterval) {
+    if (settings.presenceResetInterval > 0 && value) {
+        runIn((settings.presenceResetInterval as int) * 60000, 'resetPresence')
+    } else if (settings.presenceResetInterval > 0) {
         unschedule('resetPresence')
     }
 }
@@ -450,8 +453,8 @@ void updated() {
         scheduleDeviceHealthCheck(interval)
     }
 
-    if (settings.presenceResetInterval && device.currentValue('presence') == 'present') {
-        runIn((settings.presenceResetInterval as int) * 3600, 'resetPresence')
+    if (settings.presenceResetInterval > 0 && device.currentValue('presence') == 'present') {
+        runIn((settings.presenceResetInterval as int) * 60000, 'resetPresence')
     }
 
     runIn(1, 'configure')
