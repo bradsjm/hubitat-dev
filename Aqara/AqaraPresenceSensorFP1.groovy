@@ -527,16 +527,16 @@ private static String getCalculatorHeader() {
                 const row = Math.floor(i / numCols);
                 const col = i % numCols;
                 if (hasBitSet(sums[row], col)) {
-                    cells[i].classList.add('selected');
+                    cells[i].classList.add('fp1-grid-box-selected');
                 }
             }
         }
 
         function fp1UpdateRowSums(tableElement) {
-            const cells = tableElement.querySelectorAll('.box');
+            const cells = tableElement.querySelectorAll('.fp1-grid-box');
             const sums = Array(numRows).fill(0);
             for (let i = 0; i < cells.length; i++) {
-                if (cells[i].classList.contains('selected')) {
+                if (cells[i].classList.contains('fp1-grid-box-selected')) {
                     const row = Math.floor(i / numCols);
                     const col = i % numCols;
                     sums[row] += 1 << col;
