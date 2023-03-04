@@ -117,12 +117,9 @@ List<String> configure() {
     log.info 'configure...'
 
     // Voodoo magik, writing the the Xiamoi Cluster Raw Attribute seems to be needed to complete pairing
-    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00 00 00 00 00 00 00 00', [:], DELAY_MS)
-    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, 'AA 74 02 44 00 9C 03 20', [:], DELAY_MS)
-    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, 'AA 74 02 44 01 9B 01 20', [:], DELAY_MS)
-    //cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, 0x00FF, DataType.STRING_OCTET, '10 89 34 86 38 41 04 19 89 90 79 74 27 27 80 18 45', [:], DELAY_MS)
+    cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00 00 00 00 00 00 00 00', [:], DELAY_MS)
 
-    // configure reporting for settings
+    // configure reporting for settings (I'm not convinced this actually makes any difference)
     cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
     cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, TRIGGER_DISTANCE_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
     cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, DIRECTION_MODE_ATTR_ID, DataType.UINT8, 5, 360, 1, [:], DELAY_MS)
@@ -360,7 +357,7 @@ void parseXiaomiCluster(Map descMap) {
             //     log.debug "distance ${distanceCm}cm"
             //     break
         default:
-            log.warn "zigbee received unknown Xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
+            log.warn "zigbee received unknown xiaomi cluster attribute 0x${descMap.attrId} (value ${descMap.value})"
             break
     }
 }
@@ -371,9 +368,11 @@ void parseXiaomiClusterPresence(Integer value) {
     }
     updateAttribute('presence', value == 0 ? 'not present' : 'present')
 
-    if (settings.presenceResetInterval > 0 && value) {
-        runIn((settings.presenceResetInterval as int) * 60000, 'resetPresence')
-    } else if (settings.presenceResetInterval > 0) {
+    boolean watchdogEnabled = (settings.presenceResetInterval as Integer) > 0
+    if (watchdogEnabled && value) {
+        int seconds = (settings.presenceResetInterval as int) * 60 * 60
+        runIn(seconds, 'resetPresence')
+    } else if (watchdogEnabled) {
         unschedule('resetPresence')
     }
 }
@@ -453,8 +452,11 @@ void updated() {
         scheduleDeviceHealthCheck(interval)
     }
 
-    if (settings.presenceResetInterval > 0 && device.currentValue('presence') == 'present') {
-        runIn((settings.presenceResetInterval as int) * 60000, 'resetPresence')
+    boolean watchdogEnabled = (settings.presenceResetInterval as Integer) > 0
+    if (watchdogEnabled && device.currentValue('presence') == 'present') {
+        int seconds = (settings.presenceResetInterval as int) * 60 * 60
+        log.info "setting presence reset watchdog timer for ${seconds} seconds"
+        runIn(seconds, 'resetPresence')
     }
 
     runIn(1, 'configure')
@@ -743,7 +745,7 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 
 @Field static final Map PresenceResetOpts = [
     defaultValue: 0,
-    options     : [0: 'Disabled', 60: 'After 1 Hour', 2: 'After 2 Hours', 4: 'After 4 Hours', 8: 'After 8 Hours', 12: 'After 12 Hours']
+    options     : [0: 'Disabled', 1: 'After 1 Hour', 2: 'After 2 Hours', 4: 'After 4 Hours', 8: 'After 8 Hours', 12: 'After 12 Hours']
 ]
 
 // Command timeout before setting healthState to offline
