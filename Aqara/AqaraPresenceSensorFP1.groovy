@@ -70,31 +70,31 @@ metadata {
         input name: 'directionMode', type: 'enum', title: '<b>Monitoring Direction Mode</b>', options: DirectionModeOpts.options, defaultValue: DirectionModeOpts.defaultValue, description: \
              '<i>Select capability mode for direction detection (left and right).</i>'
 
-        input name: 'detectionRegion1', type: 'text', title: '<b><span style="font-size: 1.2em">&#10122;</span> Detection Region</b>', description: getCalculatorGrid('region1')
+        input name: 'detectionRegion1', type: 'text', title: '<b>&#9312; Detection Region</b>', description: getCalculatorGrid('region1')
 
-        input name: 'detectionRegion2', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10123;</span> Detection Region</b>', description: getCalculatorGrid('region2')
+        input name: 'detectionRegion2', type: 'text', title: '<b>&#9313; Detection Region</b>', description: getCalculatorGrid('region2')
 
-        input name: 'detectionRegion3', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10124;</span> Detection Region</b>', description: getCalculatorGrid('region3')
+        input name: 'detectionRegion3', type: 'text', title: '<b>&#9314; Detection Region</b>', description: getCalculatorGrid('region3')
 
-        input name: 'detectionRegion4', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10125;</span> Detection Region</b>', description: getCalculatorGrid('region4')
+        input name: 'detectionRegion4', type: 'text', title: '<b>&#9315; Detection Region</b>', description: getCalculatorGrid('region4')
 
-        input name: 'detectionRegion5', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10126;</span> Detection Region</b>', description: getCalculatorGrid('region5')
+        input name: 'detectionRegion5', type: 'text', title: '<b>&#9316; Detection Region</b>', description: getCalculatorGrid('region5')
 
-        input name: 'detectionRegion6', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10127;</span> Detection Region</b>', description: getCalculatorGrid('region6')
+        input name: 'detectionRegion6', type: 'text', title: '<b>&#9317; Detection Region</b>', description: getCalculatorGrid('region6')
 
-        input name: 'detectionRegion7', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10128;</span> Detection Region</b>', description: getCalculatorGrid('region7')
+        input name: 'detectionRegion7', type: 'text', title: '<b>&#9318; Detection Region</b>', description: getCalculatorGrid('region7')
 
-        input name: 'detectionRegion8', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10129;</span> Detection Region</b>', description: getCalculatorGrid('region8')
+        input name: 'detectionRegion8', type: 'text', title: '<b>&#9319; Detection Region</b>', description: getCalculatorGrid('region8')
 
-        input name: 'detectionRegion9', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10130;</span> Detection Region</b>', description: getCalculatorGrid('region9')
+        input name: 'detectionRegion9', type: 'text', title: '<b>&#9320; Detection Region</b>', description: getCalculatorGrid('region9')
 
-        input name: 'detectionRegion10', type: 'text', title: '<b><span style="font-size: 1.2em;">&#10131;</span> Detection Region</b>', description: getCalculatorGrid('region10')
+        input name: 'detectionRegion10', type: 'text', title: '<b>&#9321; Detection Region</b>', description: getCalculatorGrid('region10')
 
-        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorGrid('interference')
+        input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorGrid('interference', 'red')
 
-        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorGrid('exitentrances')
+        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorGrid('exitentrances', 'green')
 
-        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorGrid('edges')
+        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorGrid('edges', 'green')
 
         input name: 'presenceResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description: \
              '<i>Reset presence if stuck for extended period of time.</i>'
@@ -141,14 +141,16 @@ List<String> configure() {
 
     // Set or clear detection regions
     (1..10).each { int id ->
-        String grid = settings["detectionRegion${id}"]
-        if (grid && grid != '0, 0, 0, 0, 0, 0, 0') {
-            log.info "setting detection region ${id} value to " + settings["detectionRegion${id}"]
-            cmds += setDetectionRegionAttribute(id, grid.tokenize(',') as int[])
+        int[] grid = (settings["detectionRegion${id}"]?.tokenize(',') as int[]) ?: []
+        String region = "region${id}"
+        if (grid.sum() > 0) {
+            log.info "setting detection region ${id} value to ${grid}"
+            cmds += setDetectionRegionAttribute(id, grid)
+            if (device.currentValue(region) == null) { sendEvent(name: region, value: 'leave') }
         } else {
             log.info "clearing detection region ${id}"
             cmds += setDetectionRegionAttribute(id, 0, 0, 0, 0, 0, 0, 0)
-            device.deleteCurrentState("region${id}")
+            device.deleteCurrentState(region)
         }
     }
 
@@ -320,7 +322,7 @@ void parseXiaomiCluster(Map descMap) {
             break
         case PRESENCE_ACTIONS_ATTR_ID:
             Integer value = hexStrToUnsignedInt(descMap.value)
-            parseXiaomiClusterPresenceEvent(value)
+            parseXiaomiClusterPresenceAction(value)
             break
         case REGION_EVENT_ATTR_ID:
             // Region events are sent fast and furious so we need to buffer them
@@ -366,18 +368,19 @@ void parseXiaomiClusterPresence(Integer value) {
     if (settings.logEnable) {
         log.debug "xiaomi: presence attribute is ${value}"
     }
-    updateAttribute('presence', value == 0 ? 'not present' : 'present')
-
-    boolean watchdogEnabled = (settings.presenceResetInterval as Integer) > 0
-    if (watchdogEnabled && value) {
-        int seconds = (settings.presenceResetInterval as int) * 60 * 60
-        runIn(seconds, 'resetPresence')
-    } else if (watchdogEnabled) {
-        unschedule('resetPresence')
-    }
+    if (value <= 1) {
+        updateAttribute('presence', value == 1 ? 'present' : 'not present')
+        boolean watchdogEnabled = (settings.presenceResetInterval as Integer) > 0
+        if (watchdogEnabled && value == 1) {
+            int seconds = (settings.presenceResetInterval as int) * 60 * 60
+            runIn(seconds, 'resetPresence')
+        } else if (watchdogEnabled) {
+            unschedule('resetPresence')
+        }
+        }
 }
 
-void parseXiaomiClusterPresenceEvent(Integer value) {
+void parseXiaomiClusterPresenceAction(Integer value) {
     if (settings.logEnable) {
         log.debug "xiaomi: action attribute is ${value}"
     }
@@ -393,18 +396,29 @@ void parseXiaomiClusterPresenceEvent(Integer value) {
 void parseXiaomiClusterTags(Map<Integer, Object> tags) {
     tags.each { Integer tag, Object value ->
         switch (tag) {
-            case SWBUILD_TAG_ID:
-                String swBuild = (value.toInteger() & 0xFF).toString().padLeft(4, '0')
-                if (settings.logEnable) { log.debug "xiaomi tag: swBuild (value ${swBuild})" }
-                device.updateDataValue('softwareBuild', swBuild)
-                break
-            case SENSITIVITY_LEVEL_TAG_ID:
-                if (settings.logEnable) { log.debug "xiaomi tag: sensitivityLevel (value ${value})" }
-                device.updateSetting('sensitivityLevel', [value: value.toString(), type: 'enum'])
+            case 0x03:
+                // internal temperature
                 break
             case DIRECTION_MODE_TAG_ID:
                 if (settings.logEnable) { log.debug "xiaomi tag: directionMode (value ${value})" }
                 device.updateSetting('directionMode', [value: value.toString(), type: 'enum'])
+                break
+            case SENSITIVITY_LEVEL_TAG_ID:
+                if ((device.getDataValue('softwareBuild') as Integer) >= 50) {
+                    if (settings.logEnable) { log.debug "xiaomi tag: sensitivityLevel (value ${value})" }
+                    device.updateSetting('sensitivityLevel', [value: value.toString(), type: 'enum'])
+                }
+                break
+            case PRESENCE_ACTIONS_TAG_ID:
+                parseXiaomiClusterPresenceAction(value)
+                break
+            case PRESENCE_TAG_ID:
+                parseXiaomiClusterPresence(value)
+                break
+            case SWBUILD_TAG_ID:
+                String swBuild = (value & 0xFF).toString().padLeft(4, '0')
+                if (settings.logEnable) { log.debug "xiaomi tag: swBuild (value ${swBuild})" }
+                device.updateDataValue('softwareBuild', swBuild)
                 break
             case TRIGGER_DISTANCE_TAG_ID:
                 if (settings.logEnable) { log.debug "xiaomi tag: approachDistance (value ${value})" }
@@ -412,7 +426,7 @@ void parseXiaomiClusterTags(Map<Integer, Object> tags) {
                 break
             default:
                 if (settings.logEnable) {
-                    log.debug "xiaomi decode tag: 0x${intToHexStr(tag, 1)}=${value & 0xFF}"
+                    log.debug "xiaomi decode unknown tag: 0x${intToHexStr(tag, 1)}=${value}"
                 }
                 break
         }
@@ -440,6 +454,7 @@ void updated() {
     log.info 'updated...'
     log.info "driver version ${VERSION}"
     unschedule()
+    state.clear()
 
     if (settings.logEnable) {
         log.debug settings
@@ -475,8 +490,8 @@ void updateRegions() {
 /**
  * User interface region calculator
  */
-private static String getCalculatorGrid(String id) {
-    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="fp1-grid"></table><script>\$('document').ready(() => fp1CreateTable("${id}"))</script>"""
+private static String getCalculatorGrid(String id, String color = 'blue') {
+    return """<div style="text-align: center;">&dArr;</div><table id="${id}" class="fp1-grid"></table><script>\$('document').ready(() => fp1CreateTable("${id}", "${color}"))</script>"""
 }
 
 private static String getCalculatorHeader() {
@@ -490,22 +505,30 @@ private static String getCalculatorHeader() {
             padding: 5px 20px 5px 20px;
             border: 1px dotted black;
         }
-        .fp1-grid-box-selected {
+        .fp1-grid-box-red {
+            background-color: red;
+        }
+        .fp1-grid-box-blue {
             background-color: blue;
+        }
+        .fp1-grid-box-green {
+            background-color: green;
         }
     </style>
     <script>
+        const gridBoxClass = 'fp1-grid-box';
+        const gridBoxSelectedClass = 'fp1-grid-box-';
         const numRows = 7;
         const numCols = 4;
 
-        function fp1CreateTable(tableId) {
+        function fp1CreateTable(tableId, color) {
             const tableElement = document.getElementById(tableId);
             const fragment = document.createDocumentFragment();
             for (let i = 0; i < numRows; i++) {
                 const row = document.createElement('tr');
                 for (let j = 0; j < numCols; j++) {
                     const cell = document.createElement('td');
-                    cell.classList.add('fp1-grid-box');
+                    cell.classList.add(gridBoxClass);
                     row.appendChild(cell);
                 }
                 fragment.appendChild(row);
@@ -513,18 +536,18 @@ private static String getCalculatorHeader() {
             tableElement.appendChild(fragment);
 
             tableElement.addEventListener('click', (event) => {
-                if (event.target.classList.contains('fp1-grid-box')) {
-                    event.target.classList.toggle('fp1-grid-box-selected');
-                    fp1UpdateRowSums(tableElement);
+                if (event.target.classList.contains(gridBoxClass)) {
+                    event.target.classList.toggle(gridBoxSelectedClass + color);
+                    fp1UpdateRowSums(tableElement, color);
                 }
             });
 
-            fp1PopulateTable(tableElement);
+            fp1PopulateTable(tableElement, color);
         }
 
-        function fp1PopulateTable(tableElement) {
+        function fp1PopulateTable(tableElement, color) {
             const inputElem = tableElement.parentElement.parentElement.querySelector("input[type='text']");
-            const cells = tableElement.querySelectorAll('.fp1-grid-box');
+            const cells = tableElement.querySelectorAll('.' + gridBoxClass);
             const sums = inputElem.value.split(',');
             const hasBitSet = (x, y) => ((x >> y) & 1) === 1;
             inputElem.style.display = 'none';
@@ -532,16 +555,16 @@ private static String getCalculatorHeader() {
                 const row = Math.floor(i / numCols);
                 const col = i % numCols;
                 if (hasBitSet(sums[row], col)) {
-                    cells[i].classList.add('fp1-grid-box-selected');
+                    cells[i].classList.add(gridBoxSelectedClass + color);
                 }
             }
         }
 
-        function fp1UpdateRowSums(tableElement) {
-            const cells = tableElement.querySelectorAll('.fp1-grid-box');
+        function fp1UpdateRowSums(tableElement, color) {
+            const cells = tableElement.querySelectorAll('.' + gridBoxClass);
             const sums = Array(numRows).fill(0);
             for (let i = 0; i < cells.length; i++) {
-                if (cells[i].classList.contains('fp1-grid-box-selected')) {
+                if (cells[i].classList.contains(gridBoxSelectedClass + color)) {
                     const row = Math.floor(i / numCols);
                     const col = i % numCols;
                     sums[row] += 1 << col;
@@ -631,8 +654,9 @@ private List<String> setDetectionRegionAttribute(int regionId, int ... grid) {
         return []
     }
 
-    String octetStr = '07020' + HEX_CHARS[(int) regionId] + '0000000000'
+    String octetStr
     if (grid.sum() > 0) {
+        // upsert region
         octetStr = new StringBuilder()
             .append('07010')
             .append(HEX_CHARS[(int) regionId])
@@ -645,6 +669,9 @@ private List<String> setDetectionRegionAttribute(int regionId, int ... grid) {
             .append('0')
             .append(HEX_CHARS[grid[6]])
             .append('FF')
+    } else {
+        // delete region
+        octetStr = '07030' + HEX_CHARS[(int) regionId] + '0000000000'
     }
     if (settings.logEnable) {
         log.debug "set region ${regionId} to ${octetStr}"
@@ -700,9 +727,11 @@ private void updateAttribute(String attribute, Object value, String unit = null,
     8: 'unoccupied'
 ]
 
-// Zigbee Cluster, Attribute and Xiaomi Tag IDs
+// Zigbee Cluster
+@Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
+
+// Zigbee Attributes
 @Field static final int DIRECTION_MODE_ATTR_ID = 0x0144
-@Field static final int DIRECTION_MODE_TAG_ID = 0x67
 @Field static final int MODEL_ATTR_ID = 0x05
 @Field static final int PING_ATTR_ID = 0x01
 @Field static final int PRESENCE_ACTIONS_ATTR_ID = 0x0143
@@ -710,17 +739,21 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 @Field static final int REGION_EVENT_ATTR_ID = 0x0151
 @Field static final int RESET_PRESENCE_ATTR_ID = 0x0157
 @Field static final int SENSITIVITY_LEVEL_ATTR_ID = 0x010C
-@Field static final int SENSITIVITY_LEVEL_TAG_ID = 0x66
 @Field static final int SET_EDGE_REGION_ATTR_ID = 0x0156
 @Field static final int SET_EXIT_REGION_ATTR_ID = 0x0153
 @Field static final int SET_INTERFERENCE_ATTR_ID = 0x0154
 @Field static final int SET_REGION_ATTR_ID = 0x0150
-@Field static final int SWBUILD_TAG_ID = 0x08
 @Field static final int TRIGGER_DISTANCE_ATTR_ID = 0x0146
-@Field static final int TRIGGER_DISTANCE_TAG_ID = 0x69
-@Field static final int XIAOMI_CLUSTER_ID = 0xFCC0
 @Field static final int XIAOMI_RAW_ATTR_ID = 0xFFF2
 @Field static final int XIAOMI_SPECIAL_REPORT_ID = 0x00F7
+
+// Xiaomi Tags
+@Field static final int DIRECTION_MODE_TAG_ID = 0x67
+@Field static final int SENSITIVITY_LEVEL_TAG_ID = 0x66
+@Field static final int SWBUILD_TAG_ID = 0x08
+@Field static final int TRIGGER_DISTANCE_TAG_ID = 0x69
+@Field static final int PRESENCE_ACTIONS_TAG_ID = 0x66
+@Field static final int PRESENCE_TAG_ID = 0x65
 
 // Configuration options
 @Field static final Map ApproachDistanceOpts = [

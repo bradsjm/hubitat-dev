@@ -5,6 +5,13 @@ The Aqara FP1 is a [presence detector](https://www.aqara.com/cn/Aqara-Presence-D
 
 This makes it particularly suitable for use in living rooms or other locations where occupants may be present but not moving enough to activate traditional passive infrared (PIR) sensors.
 
+## Zigbee Channel
+This sensor reportedly [does not work](https://github.com/Koenkk/zigbee2mqtt/issues/11019#issuecomment-1064063808) on Zigbee channel 21-24.
+
+## Pairing
+Press and hold the reset button on the device for +- 5 seconds (until the blue light starts blinking).
+After this the device will automatically join. If this doesn't work, try with a single short button press.
+
 ## Driver Configuration
 The driver provides the following attributes:
 * Motion Sensor (motion)
