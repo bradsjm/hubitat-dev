@@ -215,7 +215,9 @@ String oauthInitialize() {
     String redirectUri = URLEncoder.encode('https://cloud.hubitat.com/oauth/stateredirect')
     String state = URLEncoder.encode(state.oauthState)
 
-    return "https://api.sonos.com/login/v3/oauth?client_id=${clientId}&response_type=code&state=${state}&scope=playback-control-all&redirect_uri=${redirectUri}"
+    String link = "https://api.sonos.com/login/v3/oauth?client_id=${clientId}&response_type=code&state=${state}&scope=playback-control-all&redirect_uri=${redirectUri}"
+    log.info "oauth link: ${link}"
+    return link
 }
 
 Map oauthCallback() {
