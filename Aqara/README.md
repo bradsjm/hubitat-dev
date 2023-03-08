@@ -53,7 +53,10 @@ When multipe regions are defined, it is possible to configure the regions to ove
 To reduce the impact of rapid region updates on Hubitat, changes are buffered. When there have been no changes for half a second the region attributes will be updated to their latest states.
 
 ### Approach Distance
-The approach distance setting allows you to define how far away the sensor is. This helps the FP1 to determine if someone is moving towards the sensor or away from it. Changing the setting does not impact the detection grids.
+The approach distance setting allows you to define how far away the sensor is. This helps the FP1 to determine if someone is moving towards the sensor or away from it. One person posted they thought the setting impacted the region grid as follows *(this has not been confirmed)*:
+- Detection set to "Far" = Y-grid is around ~80cm (2.6feet)
+- Detection set to "Medium" = Y-grid is around ~60cm (2feet)
+- Detection set to "Near" = Y-grid is around ~35cm (1.15feet)
 
 ### Motion Sensitivity
 The motion sensitivity can be adjusted to reduce false positives (e.g. animals, fans etc.) by reducing it to Low or Medium. However, if it is set too low it may not detect the continued presence of people sitting very still. At the highest level it should be sensitive to people breathing.
