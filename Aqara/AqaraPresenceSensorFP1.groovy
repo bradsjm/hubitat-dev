@@ -52,12 +52,12 @@ metadata {
         attribute 'region2', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
         attribute 'region3', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
         attribute 'region4', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
-        attribute 'region5', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
-        attribute 'region6', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
-        attribute 'region7', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
-        attribute 'region8', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
-        attribute 'region9', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
-        attribute 'region10', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        // attribute 'region5', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        // attribute 'region6', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        // attribute 'region7', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        // attribute 'region8', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        // attribute 'region9', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        // attribute 'region10', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
 
         fingerprint model: 'lumi.motion.ac01', manufacturer: 'aqara', profileId: '0104', endpointId: '01', inClusters: '0000,0003,FCC0', outClusters: '0003,0019', application: '36'
     }
@@ -83,24 +83,23 @@ metadata {
 
         input name: 'detectionRegion4', type: 'text', title: '<b>&#9315; Detection Region</b>', description: getCalculatorGrid('region4')
 
-        input name: 'detectionRegion5', type: 'text', title: '<b>&#9316; Detection Region</b>', description: getCalculatorGrid('region5')
+        // input name: 'detectionRegion5', type: 'text', title: '<b>&#9316; Detection Region</b>', description: getCalculatorGrid('region5')
 
-        input name: 'detectionRegion6', type: 'text', title: '<b>&#9317; Detection Region</b>', description: getCalculatorGrid('region6')
+        // input name: 'detectionRegion6', type: 'text', title: '<b>&#9317; Detection Region</b>', description: getCalculatorGrid('region6')
 
-        input name: 'detectionRegion7', type: 'text', title: '<b>&#9318; Detection Region</b>', description: getCalculatorGrid('region7')
+        // input name: 'detectionRegion7', type: 'text', title: '<b>&#9318; Detection Region</b>', description: getCalculatorGrid('region7')
 
-        input name: 'detectionRegion8', type: 'text', title: '<b>&#9319; Detection Region</b>', description: getCalculatorGrid('region8')
+        // input name: 'detectionRegion8', type: 'text', title: '<b>&#9319; Detection Region</b>', description: getCalculatorGrid('region8')
 
-        input name: 'detectionRegion9', type: 'text', title: '<b>&#9320; Detection Region</b>', description: getCalculatorGrid('region9')
+        // input name: 'detectionRegion9', type: 'text', title: '<b>&#9320; Detection Region</b>', description: getCalculatorGrid('region9')
 
-        input name: 'detectionRegion10', type: 'text', title: '<b>&#9321; Detection Region</b>', description: getCalculatorGrid('region10')
+        // input name: 'detectionRegion10', type: 'text', title: '<b>&#9321; Detection Region</b>', description: getCalculatorGrid('region10')
 
         input name: 'interferenceRegion', type: 'text', title: '<b>Interference Grid (Optional)</b>', description: getCalculatorGrid('interference', 'red')
 
-        input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorGrid('exitentrances', 'green')
+        // input name: 'exitEntrancesRegion', type: 'text', title: '<b>Exit/Entrance Grid (Optional)</b>', description: getCalculatorGrid('exitentrances', 'green')
 
-        input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorGrid('edges', 'green')
-
+        // input name: 'edgesRegion', type: 'text', title: '<b>Edge Definition Grid (Optional)</b>', description: getCalculatorGrid('edges', 'green')
 
         input name: 'stateResetInterval', type: 'enum', title: '<b>Presence Watchdog</b>', options: PresenceResetOpts.options, defaultValue: PresenceResetOpts.defaultValue, description: \
              '<i>Reset presence if stuck for extended period of time.</i>'
@@ -119,10 +118,13 @@ metadata {
 List<String> configure() {
     List<String> cmds = []
     log.info 'configure...'
-    state.clear()
 
-    // Aqara Voodoo needs this to sucessfully pair with extended delay needed
-    cmds += zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00', MFG_CODE, 2000)
+    if (!state.paired) {
+        // Aqara Voodoo needs this to sucessfully pair but also seems to cause some devices to reset
+        state.clear()
+        state.paired = true
+        return zigbee.writeAttribute(XIAOMI_CLUSTER_ID, XIAOMI_RAW_ATTR_ID, DataType.STRING_OCTET, '00', MFG_CODE, 5000)
+    }
 
     // configure reporting for settings (I'm not convinced this actually makes any difference)
     cmds += zigbee.configureReporting(XIAOMI_CLUSTER_ID, SENSITIVITY_LEVEL_ATTR_ID, DataType.UINT8, 5, 360, 1, MFG_CODE, DELAY_MS)
