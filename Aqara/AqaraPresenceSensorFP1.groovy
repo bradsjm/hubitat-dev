@@ -48,16 +48,16 @@ metadata {
         attribute 'healthStatus', 'enum', ['unknown', 'offline', 'online']
         attribute 'roomState', 'enum', PRESENCE_STATES.values() as List<String>
         attribute 'roomActivity', 'enum', PRESENCE_ACTIONS.values() as List<String>
-        attribute 'region1', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region2', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region3', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region4', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region5', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region6', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region7', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region8', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region9', 'enum', REGION_ACTIONS.values() as List<String>
-        attribute 'region10', 'enum', REGION_ACTIONS.values() as List<String>
+        attribute 'region1', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region2', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region3', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region4', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region5', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region6', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region7', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region8', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region9', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
+        attribute 'region10', 'enum', REGION_BASIC_ACTIONS.values() + REGION_ACTIONS.values() as List<String>
 
         fingerprint model: 'lumi.motion.ac01', manufacturer: 'aqara', profileId: '0104', endpointId: '01', inClusters: '0000,0003,FCC0', outClusters: '0003,0019', application: '36'
     }
@@ -200,6 +200,7 @@ List<String> configure() {
 void deviceCommandTimeout() {
     log.warn 'no response received (device offline?)'
     updateAttribute('healthStatus', 'offline')
+    resetState()
 }
 
 void installed() {
@@ -221,7 +222,10 @@ void parse(String description) {
     updateAttribute('healthStatus', 'online')
     unschedule('deviceCommandTimeout')
 
-    if (descMap.isClusterSpecific == false) {
+    if (descMap.profileId == '0000') {
+        parseZdo(descMap)
+        return
+    } else if (descMap.isClusterSpecific == false) {
         parseGlobalCommands(descMap)
         return
     }
@@ -450,6 +454,41 @@ void parseXiaomiClusterTags(Map<Integer, Object> tags) {
     }
 }
 
+void parseZdo(Map descMap) {
+    switch (descMap.clusterInt as Integer) {
+        case 0x8005: //endpoint response
+            if (settings.logEnable) {
+                log.debug "zdo command: cluster: ${descMap.clusterId} (endpoint response) ${descMap.data}"
+            }
+            break
+        case 0x8004: //simple descriptor response
+            if (settings.logEnable) {
+                log.debug "zdo command: cluster: ${descMap.clusterId} (simple descriptor response)"
+            }
+            break
+        case 0x8034: //leave response
+            if (settings.logEnable) {
+                log.debug "zdo command: cluster: ${descMap.clusterId} (leave response)"
+            }
+            break
+        case 0x8021: //bind response
+            if (settings.logEnable) {
+                log.debug "zdo command: cluster: ${descMap.clusterId} (bind response) ${descMap}"
+            }
+            break
+        case 0x8022: //unbind request
+            if (settings.logEnable) {
+                log.debug "zdo command: cluster: ${descMap.clusterId} (unbind request)"
+            }
+            break
+        case 0x0013: //"device announce"
+            if (settings.logEnable) {
+                log.debug "zdo command: cluster: ${descMap.clusterId} (device announce)"
+            }
+            break
+    }
+}
+
 List<String> ping() {
     if (settings.txtEnable) {
         log.info 'ping...'
@@ -514,10 +553,11 @@ void updated() {
 void updateRegions() {
     if (settings.logEnable) { log.debug 'processing region cache' }
     Map<Integer, Integer> regions = RegionUpdateBuffer.get(device.id)
+    boolean simpleMode = (settings.regionDetailLevel as Integer) == 1
     for (iter = regions.entrySet().iterator(); iter.hasNext();) {
         Map.Entry<Integer, Integer> entry = iter.next()
         iter.remove()
-        String value = ((settings.regionDetailLevel as Integer) == 1) ? 'active' : REGION_ACTIONS.get(entry.value)
+        String value = simpleMode ? REGION_BASIC_ACTIONS.get(entry.value) : REGION_ACTIONS.get(entry.value)
         updateAttribute("region${entry.key}", value)
     }
 }
@@ -761,6 +801,13 @@ private void updateAttribute(String attribute, Object value, String unit = null,
 ]
 
 // Set of Region Actions
+@Field static final Map<Integer, String> REGION_BASIC_ACTIONS = [
+    1: 'active',
+    2: 'inactive',
+    4: 'active',
+    8: 'inactive'
+]
+
 @Field static final Map<Integer, String> REGION_ACTIONS = [
     1: 'enter',
     2: 'leave',
